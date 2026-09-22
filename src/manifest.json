@@ -1,0 +1,14 @@
+{
+  "name": "Câmbio — Moedas & Simulador VET",
+  "short_name": "Câmbio",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0E1210",
+  "theme_color": "#0E1210",
+  "icons": [
+    { "src": "cambio-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "cambio-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "cambio-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
