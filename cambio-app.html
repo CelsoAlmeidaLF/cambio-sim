@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1210">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' ws: wss: https://economia.awesomeapi.com.br; img-src 'self' data:; manifest-src 'self';">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="cambio-icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="cambio-icon-512.png">
+<title>Câmbio — Moedas & Simulador VET</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="page">
+
+  <div class="eyebrow">CÂMBIO · TAXAS AO VIVO</div>
+  <h1>Câmbio</h1>
+  <p class="lede">USD, EUR, BTC, GBP, CAD e ARS em relação ao real.</p>
+
+  <!-- Seletor de Moedas Expandido -->
+  <div class="tabs-seed" id="currency-tabs" role="group" aria-label="Moeda" style="margin-top:18px;">
+    <button type="button" class="tab-btn-seed active" data-cur="USD" aria-pressed="true">USD</button>
+    <button type="button" class="tab-btn-seed" data-cur="EUR" aria-pressed="false">EUR</button>
+    <button type="button" class="tab-btn-seed" data-cur="BTC" aria-pressed="false">BTC</button>
+    <button type="button" class="tab-btn-seed" data-cur="GBP" aria-pressed="false">GBP</button>
+    <button type="button" class="tab-btn-seed" data-cur="CAD" aria-pressed="false">CAD</button>
+    <button type="button" class="tab-btn-seed" data-cur="ARS" aria-pressed="false">ARS</button>
+  </div>
+
+  <h2>Cotação <span class="count" id="pair-label">USD ⇄ BRL</span></h2>
+  <div class="card" id="board" aria-live="polite">
+    <div class="hero-seed">
+      <div class="hero-label-seed" id="board-label">DÓLAR COMERCIAL — COMPRA</div>
+      <div class="hero-amount-seed skeleton-block" id="rate-value">0,0000</div>
+      <div class="hero-delta-row">
+        <div class="hero-delta-seed warn" id="rate-delta">—</div>
+        <div class="alert-badge" id="alert-badge">🔔 alerta ativo</div>
+      </div>
+    </div>
+    <div class="updated-at" id="updated-at">carregando…</div>
+
+    <div class="bidask-grid">
+      <div class="bidask-card">
+        <div class="k">COMPRA (BID)</div>
+        <div class="v skeleton-block" id="bid-value">0,0000</div>
+      </div>
+      <div class="bidask-card">
+        <div class="k">VENDA (ASK)</div>
+        <div class="v skeleton-block" id="ask-value">0,0000</div>
+      </div>
+    </div>
+
+    <!-- Histórico / Sparkline com Tooltip -->
+    <div class="spark-wrap">
+      <div class="tabs-seed small" role="group" aria-label="Período" style="margin-bottom:14px;">
+        <button type="button" class="tab-btn-seed" id="per-7d">7D</button>
+        <button type="button" class="tab-btn-seed active" id="per-30d">30D</button>
+        <button type="button" class="tab-btn-seed" id="per-90d">90D</button>
+        <button type="button" class="tab-btn-seed" id="per-1a">1A</button>
+      </div>
+      <div class="spark-tooltip" id="spark-tooltip"></div>
+      <svg id="spark" viewBox="0 0 400 68" preserveAspectRatio="none"></svg>
+      <div class="spark-skeleton skeleton-block" id="spark-skeleton"></div>
+      <div class="spark-labels">
+        <span id="spark-start">—</span>
+        <span id="spark-end">hoje</span>
+      </div>
+    </div>
+
+    <div class="stat-grid-seed" style="margin-top:18px;">
+      <div class="stat-card-seed">
+        <div class="k">MÁXIMA</div>
+        <div class="v skeleton-block" id="stat-high">0,0000</div>
+      </div>
+      <div class="stat-card-seed">
+        <div class="k">MÍNIMA</div>
+        <div class="v skeleton-block" id="stat-low">0,0000</div>
+      </div>
+      <div class="stat-card-seed">
+        <div class="k">VARIAÇÃO</div>
+        <div class="v skeleton-block" id="stat-var">0,00%</div>
+      </div>
+    </div>
+
+    <div class="alert-seed danger" id="currency-error" role="alert"></div>
+
+    <div class="refresh-row">
+      <button class="btn-seed btn-secondary-seed btn-full" id="refresh" type="button">Atualizar cotação</button>
+      <span class="auto-note" id="auto-note">auto 5min</span>
+    </div>
+  </div>
+
+  <!-- Botões para abrir as Ferramentas em Modal -->
+  <div class="quick-tools-grid">
+    <button type="button" class="btn-tool" id="btn-open-vet">
+      <span class="tool-icon">🧮</span>
+      <span class="tool-info">
+        <span>Simulador VET</span>
+        <small>IOF e Spread bancário</small>
+      </span>
+    </button>
+    <button type="button" class="btn-tool" id="btn-open-alert">
+      <span class="tool-icon">🔔</span>
+      <span class="tool-info">
+        <span>Alerta de Cotação</span>
+        <small>Notificação de preço</small>
+      </span>
+    </button>
+  </div>
+
+  <!-- Conversor Direto -->
+  <h2>Conversor</h2>
+  <div class="card col-gap">
+    <div class="converter-grid">
+      <div>
+        <label class="field-label" for="conv-input" id="conv-input-label">USD</label>
+        <input type="text" id="conv-input" inputmode="decimal" value="1,00">
+      </div>
+      <button type="button" class="invert-btn" id="conv-invert" aria-label="Inverter sentido da conversão">⇄</button>
+      <div>
+        <label class="field-label" for="conv-output" id="conv-output-label">BRL</label>
+        <input type="text" id="conv-output" inputmode="decimal" value="—" readonly>
+      </div>
+    </div>
+    <button class="btn-seed btn-primary-seed btn-full" id="btn-add-log" type="button" style="margin-top:6px;">+ Adicionar ao Histórico</button>
+  </div>
+
+  <!-- Histórico de Conversões -->
+  <h2>Últimas conversões <button type="button" class="link-btn" id="clear-log">limpar</button></h2>
+  <div class="card" id="log-card">
+    <div id="log-list"><div class="empty-note">Nenhuma conversão salva ainda. Clique em [+ Adicionar ao Histórico].</div></div>
+  </div>
+
+  <div class="alert-seed danger" id="status" role="alert"></div>
+
+  <!-- MODAL: Simulador VET (Oculto na página) -->
+  <div class="modal-overlay" id="modal-vet" role="dialog" aria-modal="true" aria-labelledby="modal-vet-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="modal-vet-title">Simulador VET</h3>
+          <div class="modal-subtitle">Valor Efetivo Total & Custos</div>
+        </div>
+        <button type="button" class="modal-close-btn" data-close="modal-vet" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body col-gap">
+        <div class="vet-grid">
+          <div>
+            <label class="field-label" for="vet-amount">Quantia Estrangeira</label>
+            <input type="text" id="vet-amount" inputmode="decimal" value="1.000,00">
+          </div>
+          <div>
+            <label class="field-label" for="vet-spread">Spread Bancário (%)</label>
+            <input type="text" id="vet-spread" inputmode="decimal" value="1,50">
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="vet-iof">Modalidade / Alíquota IOF</label>
+          <select id="vet-iof">
+            <option value="especie">Dinheiro em Espécie (IOF 1,1%)</option>
+            <option value="cartao">Cartão de Crédito / Débito Internacional (IOF 4,38%)</option>
+            <option value="remessa_mesma_titularidade">Conta Internacional Própria (IOF 1,1%)</option>
+            <option value="remessa_outra_titularidade">Remessa para Terceiros (IOF 0,38%)</option>
+            <option value="nenhum">Isento / Sem IOF (0,0%)</option>
+          </select>
+        </div>
+
+        <div class="vet-result-card">
+          <div class="line">
+            <span>Câmbio com Spread:</span>
+            <strong id="vet-commercial">—</strong>
+          </div>
+          <div class="line">
+            <span>VET Efetivo (com IOF):</span>
+            <strong id="vet-rate">—</strong>
+          </div>
+          <div class="line">
+            <span>Custo do Spread:</span>
+            <span id="vet-spread-cost">—</span>
+          </div>
+          <div class="line">
+            <span>Custo do IOF:</span>
+            <span id="vet-iof-cost">—</span>
+          </div>
+          <div class="line highlight">
+            <span>Total a Pagar:</span>
+            <strong id="vet-total">—</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Alerta de Cotação (Oculto na página) -->
+  <div class="modal-overlay" id="modal-alert" role="dialog" aria-modal="true" aria-labelledby="modal-alert-title">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="modal-alert-title">Alerta de Cotação (<span id="alert-currency-label">USD</span>)</h3>
+          <div class="modal-subtitle">Notificações e limites de preço</div>
+        </div>
+        <button type="button" class="modal-close-btn" data-close="modal-alert" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body col-gap">
+        <div>
+          <label class="field-label" for="alert-value">Avisar quando 1 <span id="alert-cur-name">USD</span> valer, em BRL</label>
+          <input type="text" id="alert-value" inputmode="decimal" placeholder="ex: 5,40">
+        </div>
+        <div class="alert-dir-toggle">
+          <button type="button" class="alert-dir-btn active" id="alert-dir-above">▲ acima de</button>
+          <button type="button" class="alert-dir-btn" id="alert-dir-below">▼ abaixo de</button>
+        </div>
+        <div class="row-gap">
+          <button class="btn-seed btn-primary-seed" id="alert-save" type="button" style="flex:1;">Salvar alerta</button>
+          <button class="btn-seed btn-secondary-seed" id="alert-clear" type="button">Remover</button>
+        </div>
+        <button class="btn-seed btn-secondary-seed btn-full" id="btn-notify-perm" type="button">🔔 Ativar notificações push</button>
+        <div class="empty-note" id="alert-status"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    FONTE DE DADOS: AwesomeAPI (economia.awesomeapi.com.br)<br>
+    Cotações de mercado são informativas e sujeitas a variação contínua.
+  </footer>
+</div>
+
+<script src="js/cambio-engine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
