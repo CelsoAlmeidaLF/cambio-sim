@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v8-bio-passkey';
+const CACHE = 'cambio-app-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -29,16 +29,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  // shell local: cache-first (funciona offline)
   // chamadas à API de cotação: sempre rede (nunca cachear cotação)
   if (event.request.url.indexOf('awesomeapi.com.br') !== -1) return;
+  // Rede primeiro: atualizações valem na hora; o cache só entra quando estiver offline.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((res) => {
-        var resClone = res.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, resClone));
-        return res;
-      }).catch(() => cached);
-    })
+    fetch(event.request).then((response) => {
+      if (response && response.status === 200 && event.request.method === 'GET') {
+        const clone = response.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+      }
+      return response;
+    }).catch(() => caches.match(event.request, { ignoreSearch: true }))
   );
 });
