@@ -35,7 +35,7 @@ describe('CambioEngine - Testes do Motor Financeiro', () => {
   });
 
   test('calculateVET deve computar spread, IOF e VET corretamente', () => {
-    // 1000 USD, cotação base 5.00, spread 1.5%, IOF espécie (1.1%)
+    // 1000 USD, cotação base 5.00, spread 1.5%, IOF espécie (3.5%)
     const vet = CambioEngine.calculateVET({
       amountForeign: 1000,
       baseRate: 5.0,
@@ -46,15 +46,25 @@ describe('CambioEngine - Testes do Motor Financeiro', () => {
     assert.ok(vet !== null);
     // 5.00 * 1.015 = 5.075 (cotação com spread)
     assert.equal(vet.commercialWithSpread, 5.075);
-    // VET = 5.075 * 1.011 = 5.130825
-    assert.equal(vet.vetRate, 5.130825);
+    // VET = 5.075 * 1.035 = 5.252625
+    assert.equal(vet.vetRate, 5.252625);
     // Subtotal = 1000 * 5.075 = 5075
-    // IOF em BRL = 5075 * 0.011 = 55.83 (arredondado a centavos)
-    assert.equal(vet.iofCostBrl, 55.83);
+    // IOF em BRL = 5075 * 0.035 = 177.63 (arredondado a centavos)
+    assert.equal(vet.iofCostBrl, 177.63);
     // Custo spread = 1000 * (5.075 - 5.0) = 75
     assert.equal(vet.spreadCostBrl, 75);
-    // Total = 5075 + 55.83 = 5130.83
-    assert.equal(vet.totalBrl, 5130.83);
+    // Total = 5075 + 177.63 = 5252.63
+    assert.equal(vet.totalBrl, 5252.63);
+  });
+
+  test('calculateVET usa as alíquotas de IOF do Decreto 12.499/2025', () => {
+    const iofOf = (iofRate) => CambioEngine.calculateVET({ amountForeign: 100, baseRate: 5.0, spreadPercent: 0, iofRate }).iofCostBrl;
+    assert.equal(iofOf('especie'), 17.5);
+    assert.equal(iofOf('cartao'), 17.5);
+    assert.equal(iofOf('remessa_mesma_titularidade'), 17.5);
+    assert.equal(iofOf('remessa_outra_titularidade'), 17.5);
+    assert.equal(iofOf('remessa_investimento'), 5.5);
+    assert.equal(iofOf('nenhum'), 0);
   });
 
   test('checkAlertCondition deve validar limites superiores e inferiores', () => {
