@@ -70,13 +70,14 @@ O VET é calculado de acordo com as normas cambiais do Banco Central do Brasil:
 
 $$VET = \text{Taxa Base} \times (1 + \text{Spread}_{\%}) \times (1 + IOF)$$
 
-### Tabela de Alíquotas de IOF configuradas:
+### Tabela de Alíquotas de IOF configuradas (Decreto 12.499/2025, vigente desde 11/06/2025):
 | Modalidade | Alíquota de IOF |
 | :--- | :--- |
-| Moeda em Espécie | **1,10%** |
-| Cartão Internacional (Crédito/Débito) | **4,38%** |
-| Conta Internacional Própria (mesma titularidade) | **1,10%** |
-| Remessa Internacional para Terceiros | **0,38%** |
+| Moeda em Espécie | **3,50%** |
+| Cartão Internacional (Crédito/Débito) | **3,50%** |
+| Conta Internacional Própria (mesma titularidade) | **3,50%** |
+| Remessa Internacional para Terceiros | **3,50%** |
+| Remessa para Investimento no Exterior | **1,10%** |
 | Isenção / Comercial Puro | **0,00%** |
 
 ---

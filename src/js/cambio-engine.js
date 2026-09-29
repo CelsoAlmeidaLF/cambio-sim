@@ -16,11 +16,13 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  // Decreto 12.499/2025 (vigente desde 11/06/2025): 3,5% nas saídas de pessoa física; 1,1% em remessa para investimento
   var IOF_RATES = {
-    especie: 0.011, // 1.1% compra de moeda em espécie
-    cartao: 0.0438, // 4.38% cartão de crédito / débito internacional
-    remessa_mesma_titularidade: 0.011, // 1.1%
-    remessa_outra_titularidade: 0.0038, // 0.38%
+    especie: 0.035, // 3.5% compra de moeda em espécie
+    cartao: 0.035, // 3.5% cartão de crédito / débito / pré-pago internacional
+    remessa_mesma_titularidade: 0.035, // 3.5% conta própria no exterior (não investimento)
+    remessa_outra_titularidade: 0.035, // 3.5% remessa para terceiros
+    remessa_investimento: 0.011, // 1.1% remessa para investimento no exterior
     nenhum: 0.0
   };
 
