@@ -16,18 +16,13 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Tema claro: segue o sistema, ou a escolha feita no menu (data-theme). */
+/* Tema claro: segue o sistema do aparelho. */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
+  :root {
     --bg: #F7FAF8; --surface: #FFFFFF; --surface-2: #EFF4F0; --line: #DCE6E0;
     --ink: #16211B; --ink-dim: #667F72; --accent: #2E8B57; --accent-dim: #4EA976;
     --up: #2E8B57; --down: #C1584A; --warn: #9A7B2E; --info: #3F6E9E;
   }
-}
-:root[data-theme="light"] {
-  --bg: #F7FAF8; --surface: #FFFFFF; --surface-2: #EFF4F0; --line: #DCE6E0;
-  --ink: #16211B; --ink-dim: #667F72; --accent: #2E8B57; --accent-dim: #4EA976;
-  --up: #2E8B57; --down: #C1584A; --warn: #9A7B2E; --info: #3F6E9E;
 }
 
 * { box-sizing: inherit; }
