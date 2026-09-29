@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v8-bio-passkey';
+const CACHE = 'cambio-app-v9-tab-takeover';
 const ASSETS = [
   './',
   './index.html',
