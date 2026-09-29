@@ -222,12 +222,41 @@
     }
   }
 
+  // Se a AwesomeAPI falhar (fora do ar, limite de uso ou bloqueio), usa as fontes reserva
+  // e só volta a tentar a AwesomeAPI depois de alguns minutos, para não piorar o limite.
+  var AWESOME_RETRY_MS = 10 * 60 * 1000;
+  var awesomeDownUntil = 0;
+  var usingFallback = false;
+
+  async function getJson(url, ms) {
+    var res = await fetchWithTimeout(url, ms || 8000);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+
+  async function fetchAwesomeLast() {
+    if (Date.now() < awesomeDownUntil) throw new Error('AwesomeAPI em espera');
+    try {
+      var payload = await getJson(LAST_URL, 8000);
+      if (!payload || typeof payload !== 'object' || !payload.USDBRL) throw new Error('Resposta inválida');
+      return payload;
+    } catch (err) {
+      awesomeDownUntil = Date.now() + AWESOME_RETRY_MS;
+      throw err;
+    }
+  }
+
   async function fetchLast() {
     var codes = Object.keys(CURRENCIES);
     try {
-      var res = await fetchWithTimeout(LAST_URL, 8000);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      var payload = await res.json();
+      var payload;
+      try {
+        payload = await fetchAwesomeLast();
+        usingFallback = false;
+      } catch (awesomeErr) {
+        payload = await window.QuoteSources.fetchLast(getJson, codes);
+        usingFallback = true;
+      }
       codes.forEach(function (c) {
         var rawQuote = payload[CURRENCIES[c].key];
         var validated = Engine.validateApiQuote(rawQuote);
@@ -246,10 +275,15 @@
   async function fetchDaily(cur, period) {
     var days = PERIODS[period];
     try {
-      var res = await fetchWithTimeout(dailyUrl(CURRENCIES[cur].pair, days), 9000);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      var payload = await res.json();
-      if (!Array.isArray(payload)) throw new Error('Payload inválido');
+      var payload;
+      try {
+        if (Date.now() < awesomeDownUntil) throw new Error('AwesomeAPI em espera');
+        payload = await getJson(dailyUrl(CURRENCIES[cur].pair, days), 9000);
+        if (!Array.isArray(payload)) throw new Error('Payload inválido');
+      } catch (awesomeErr) {
+        payload = await window.QuoteSources.fetchDaily(getJson, cur, days);
+      }
+      if (!Array.isArray(payload) || !payload.length) throw new Error('Payload inválido');
       dailyData[cur] = dailyData[cur] || {};
       dailyData[cur][period] = payload;
       dailyError[cur] = dailyError[cur] || {};
@@ -685,6 +719,8 @@
     var allFailed = Object.keys(CURRENCIES).every(function (c) { return lastError[c]; });
     if (allFailed) {
       setStatus('Não foi possível obter cotações da rede. Operando com dados offline.');
+    } else if (usingFallback) {
+      setStatus('AwesomeAPI indisponível agora: usando fonte reserva (moedas com cotação diária do BCE/currency-api; BTC em tempo real pela Binance).');
     }
 
     // Pré-carrega outras moedas em background de forma controlada

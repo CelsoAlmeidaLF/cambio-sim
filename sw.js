@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v1.3.0';
+const CACHE = 'cambio-app-v1.3.1';
 const ASSETS = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const ASSETS = [
   './manifest.json',
   './css/style.css',
   './js/cambio-engine.js',
+  './js/quote-sources.js',
   './js/app.js',
   './secure-vault.js',
   './secure-ui.js',
@@ -29,8 +30,8 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  // chamadas à API de cotação: sempre rede (nunca cachear cotação)
-  if (event.request.url.indexOf('awesomeapi.com.br') !== -1) return;
+  // Cotações (AwesomeAPI e fontes reserva) e qualquer outro domínio: sempre rede, nunca cache.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   // Rede primeiro: atualizações valem na hora; o cache só entra quando estiver offline.
   event.respondWith(
     fetch(event.request).then((response) => {
