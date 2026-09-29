@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v2';
+const CACHE = 'cambio-app-v7-pin-autofill';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,10 @@ const ASSETS = [
   './css/style.css',
   './js/cambio-engine.js',
   './js/app.js',
+  './secure-vault.js',
+  './secure-ui.js',
+  './secure-ui.css',
+  './financ-icons.js',
   './cambio-icon-192.png',
   './cambio-icon-512.png'
 ];
