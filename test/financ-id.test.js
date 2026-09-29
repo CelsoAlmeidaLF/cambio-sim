@@ -186,3 +186,32 @@ test('apagar um app não apaga o FINANC ID nem os outros apps', async () => {
   assert.ok(storage.getItem('financ-id-v1'));
   await b.unlock('123456');
 });
+
+test('senha longa no lugar do PIN vale para todos os apps', async () => {
+  const storage = new MemoryStorage();
+  const a = new Vault(storage, 'cambio-sim'); const code = await a.create('123456');
+  const b = new Vault(storage, 'taxometro'); await b.create('123456'); await b.lock();
+  await assert.rejects(a.changeSecretKind('123456', 'curta', 'password'), /10 caracteres/);
+  await assert.rejects(a.changeSecretKind('000000', 'minha frase segura', 'password'), { name: 'OperationError' });
+  await a.changeSecretKind('123456', 'minha frase segura', 'password');
+  assert.equal(a.secretKind, 'password');
+  await assert.rejects(b.unlock('123456'), { name: 'OperationError' });
+  await b.unlock('minha frase segura');
+  assert.equal(b.secretKind, 'password');
+  // Com senha, trocar exige outra senha longa, não um PIN.
+  await assert.rejects(b.changePin('minha frase segura', '654321'), /10 caracteres/);
+  await b.changePin('minha frase segura', 'outra frase segura');
+  // App novo no aparelho entra com a senha.
+  const c = new Vault(storage, 'gerenc-fin');
+  assert.equal(c.secretKind, 'password');
+  assert.equal(await c.create('outra frase segura'), null);
+  // Voltar ao PIN.
+  await c.changeSecretKind('outra frase segura', '777777', 'pin');
+  await a.lock(); await a.unlock('777777');
+  assert.equal(a.secretKind, 'pin');
+  // Código de recuperação volta para PIN (a interface de recuperação usa o teclado numérico).
+  await a.changeSecretKind('777777', 'frase de novo aqui', 'password');
+  await a.lock();
+  await a.resetPassword(code, '222222');
+  assert.equal(a.secretKind, 'pin');
+});
