@@ -257,16 +257,24 @@
         payload = await window.QuoteSources.fetchLast(getJson, codes);
         usingFallback = true;
       }
+      var failed = [];
       codes.forEach(function (c) {
-        var rawQuote = payload[CURRENCIES[c].key];
-        var validated = Engine.validateApiQuote(rawQuote);
+        var validated = Engine.validateApiQuote(payload[CURRENCIES[c].key], c);
         if (validated) {
           lastData[c] = validated;
           lastError[c] = false;
-        } else {
-          lastError[c] = true;
-        }
+        } else failed.push(c);
       });
+      // Cotação fora da faixa plausível na AwesomeAPI: confere nas fontes reserva antes de desistir.
+      if (failed.length && !usingFallback) {
+        var backup = await window.QuoteSources.fetchLast(getJson, failed).catch(function () { return {}; });
+        failed = failed.filter(function (c) {
+          var validated = Engine.validateApiQuote(backup[CURRENCIES[c].key], c);
+          if (validated) { lastData[c] = validated; lastError[c] = false; }
+          return !validated;
+        });
+      }
+      failed.forEach(function (c) { lastError[c] = true; });
     } catch (err) {
       codes.forEach(function (c) { lastError[c] = true; });
     }
