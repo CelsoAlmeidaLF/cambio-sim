@@ -719,8 +719,14 @@ footer {
 }
 
 .btn-tool .tool-icon {
-  font-size: 18px;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: var(--accent);
+  background: rgba(111,207,151,0.12);
 }
 
 .btn-tool .tool-info {
@@ -734,3 +740,12 @@ footer {
   font-weight: 400;
   color: var(--ink-dim);
 }
+
+/* Ícones SVG (financ-icons.js) */
+.btn-seed, .alert-dir-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.hero-delta-seed { align-items: center; gap: 6px; }
+.pair-label { display: inline-flex; align-items: center; gap: 4px; }
+.modal-close-btn { display: grid; place-items: center; }
+.fi-spin { animation: fi-spin 1s linear infinite; }
+@keyframes fi-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fi-spin { animation: none; } }

@@ -1,23 +1,23 @@
-# 💱 Câmbio — Conversor de Moedas & Simulador VET (PWA)
+# Câmbio — Conversor de Moedas & Simulador VET (PWA)
 
 > Aplicação web progressiva (PWA) client-side, offline-first, para monitoramento de taxas de câmbio em tempo real, conversão bidirecional, simulação de Valor Efetivo Total (VET / IOF / Spread), alertas de cotação com notificações Web Push e gráficos históricos interativos.
 
 ---
 
-## 📋 Sumário
+## Sumário
 
-- [Visão Geral](#-visão-geral)
-- [Funcionalidades Principais](#-funcionalidades-principais)
-- [Segurança & Hardening](#-segurança--hardening)
-- [Simulador VET (Valor Efetivo Total)](#-simulador-vet-valor-efetivo-total)
-- [Arquitetura & Estrutura](#-arquitetura--estrutura)
-- [Testes Automatizados](#-testes-automatizados)
-- [Como Executar](#-como-executar)
-- [Licença](#-licença)
+- [Visão Geral](#visão-geral)
+- [Funcionalidades Principais](#funcionalidades-principais)
+- [Segurança & Hardening](#segurança--hardening)
+- [Simulador VET (Valor Efetivo Total)](#simulador-vet-valor-efetivo-total)
+- [Arquitetura & Estrutura](#arquitetura--estrutura)
+- [Testes Automatizados](#testes-automatizados)
+- [Como Executar](#como-executar)
+- [Licença](#licença)
 
 ---
 
-## 🌟 Visão Geral
+## Visão Geral
 
 O **Câmbio** é um aplicativo financeiro responsivo desenvolvido com foco em desempenho, segurança estrita e usabilidade offline-first. Não exige credenciais nem servidores intermediários proprietários, comunicando-se diretamente com APIs de mercado financeiro em tempo real e guardando configurações e históricos exclusivamente no dispositivo do usuário.
 
@@ -44,7 +44,7 @@ O **Câmbio** é um aplicativo financeiro responsivo desenvolvido com foco em de
 
 ---
 
-## 🔒 Segurança & Hardening
+## Segurança & Hardening
 
 1. **Content Security Policy (CSP) Estrita**:
    - Declarada via meta tag bloqueando injeção de scripts não autorizados (`default-src 'self'; script-src 'self'; ...`).
@@ -53,12 +53,18 @@ O **Câmbio** é um aplicativo financeiro responsivo desenvolvido com foco em de
 3. **Validação de Schemas & Sanitização**:
    - Os dados lidos do `localStorage` passam por validação estrutural (`validateAlerts`, `validateConversionLog`).
    - Os payloads vindos de APIs externas são normalizados e auditados (`validateApiQuote`) contra entradas malformadas.
-4. **Timeouts & Tolerância a Falhas**:
-   - Todas as requisições HTTP usam limite de tempo (timeout via `AbortController`), impedindo bloqueio de interface em conexões instáveis.
+4. **Cofre local por PIN**:
+   - Alertas e histórico de conversões ficam em um cofre AES-256-GCM protegido por PIN numérico de seis dígitos.
+   - PBKDF2-SHA-256 com 600.000 iterações protege a chave de dados, que permanece apenas na memória da sessão.
+   - A migração remove a chave AES exportável usada pela versão anterior somente depois de confirmar a gravação no novo cofre.
+5. **Sessão e recuperação**:
+   - Bloqueio automático após 15 minutos, atraso progressivo após PIN incorreto e código de recuperação exibido uma única vez.
+6. **Timeouts & Tolerância a Falhas**:
+   - Todas as requisições HTTP usam limite de tempo via `AbortController`, impedindo bloqueio de interface em conexões instáveis.
 
 ---
 
-## 📊 Simulador VET (Valor Efetivo Total)
+## Simulador VET (Valor Efetivo Total)
 
 O VET é calculado de acordo com as normas cambiais do Banco Central do Brasil:
 
@@ -75,7 +81,7 @@ $$VET = \text{Taxa Base} \times (1 + \text{Spread}_{\%}) \times (1 + IOF)$$
 
 ---
 
-## 📁 Arquitetura & Estrutura
+## Arquitetura & Estrutura
 
 ```
 cambio-sim/
@@ -97,7 +103,7 @@ cambio-sim/
 
 ---
 
-## 🧪 Testes Automatizados
+## Testes Automatizados
 
 O projeto conta com suíte de testes unitários nativa (sem dependências externas):
 
@@ -113,7 +119,7 @@ Os testes cobrem:
 
 ---
 
-## 🚀 Como Executar
+## Como Executar
 
 Por ser uma aplicação estática client-side com Service Worker, sirva os arquivos a partir de qualquer servidor web local:
 

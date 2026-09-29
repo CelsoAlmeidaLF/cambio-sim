@@ -2,8 +2,10 @@
  * app.js - Interface, Ciclo de Vida e Manipulação Segura de DOM
  */
 
-(function () {
+(async function () {
   'use strict';
+  await window.vaultReady;
+  var localStorage = window.secureStorage;
 
   var Engine = window.CambioEngine;
   if (!Engine) {
@@ -31,39 +33,7 @@
   var LOG_ENC_KEY = 'cambio_conversions_enc_v2';
   var DEVICE_KEY_STORAGE = 'cambio_device_key_v2';
 
-  // ---------- Gerenciamento da Chave Criptográfica do Dispositivo ----------
-  var cryptoKey = null;
-
-  async function getOrCreateDeviceKey() {
-    if (cryptoKey) return cryptoKey;
-    if (!('crypto' in window) || !window.crypto.subtle) {
-      return null;
-    }
-    try {
-      var storedJwk = localStorage.getItem(DEVICE_KEY_STORAGE);
-      if (storedJwk) {
-        cryptoKey = await window.crypto.subtle.importKey(
-          'jwk',
-          JSON.parse(storedJwk),
-          { name: 'AES-GCM', length: 256 },
-          false,
-          ['encrypt', 'decrypt']
-        );
-      } else {
-        cryptoKey = await window.crypto.subtle.generateKey(
-          { name: 'AES-GCM', length: 256 },
-          true,
-          ['encrypt', 'decrypt']
-        );
-        var exported = await window.crypto.subtle.exportKey('jwk', cryptoKey);
-        localStorage.setItem(DEVICE_KEY_STORAGE, JSON.stringify(exported));
-      }
-      return cryptoKey;
-    } catch (e) {
-      console.warn('Erro ao inicializar chave criptográfica local:', e);
-      return null;
-    }
-  }
+  var LOG_KEY = 'cambio_conversions_v3';
 
   var els = {
     currencyTabs: document.getElementById('currency-tabs'),
@@ -137,40 +107,26 @@
   var conversionLog = [];
 
   async function loadEncryptedLog() {
-    try {
-      var raw = localStorage.getItem(LOG_ENC_KEY);
-      if (!raw) {
-        conversionLog = [];
-        renderLog();
-        return;
+    var raw = localStorage.getItem(LOG_KEY);
+    if (raw) conversionLog = Engine.validateConversionLog(JSON.parse(raw));
+    else {
+      var legacy = localStorage.getItem(LOG_ENC_KEY);
+      if (legacy) {
+        var jwk = localStorage.getItem(DEVICE_KEY_STORAGE);
+        if (!jwk) throw new Error('Chave do histórico antigo ausente. Os registros foram preservados.');
+        var key = await crypto.subtle.importKey('jwk', JSON.parse(jwk), 'AES-GCM', false, ['decrypt']);
+        conversionLog = Engine.validateConversionLog(JSON.parse(await Engine.decryptData(JSON.parse(legacy), key)));
+        await saveEncryptedLog();
       }
-      var encryptedObj = JSON.parse(raw);
-      var key = await getOrCreateDeviceKey();
-      if (!key) {
-        conversionLog = [];
-        renderLog();
-        return;
-      }
-      var decryptedStr = await Engine.decryptData(encryptedObj, key);
-      var parsed = JSON.parse(decryptedStr);
-      conversionLog = Engine.validateConversionLog(parsed);
-    } catch (e) {
-      console.warn('Falha ao decifrar log de conversões:', e);
-      conversionLog = [];
     }
+    localStorage.removeItem(LOG_ENC_KEY);
+    localStorage.removeItem(DEVICE_KEY_STORAGE);
+    await localStorage.flush();
     renderLog();
   }
-
   async function saveEncryptedLog() {
-    try {
-      var key = await getOrCreateDeviceKey();
-      if (!key) return;
-      var plainText = JSON.stringify(conversionLog);
-      var encryptedObj = await Engine.encryptData(plainText, key);
-      localStorage.setItem(LOG_ENC_KEY, JSON.stringify(encryptedObj));
-    } catch (e) {
-      console.error('Erro ao criptografar e salvar log:', e);
-    }
+    localStorage.setItem(LOG_KEY, JSON.stringify(conversionLog));
+    await localStorage.flush();
   }
 
   function loadJSON(key, fallback, validator) {
@@ -230,13 +186,13 @@
       return;
     }
     if (Notification.permission === 'granted') {
-      els.btnNotifyPerm.textContent = '🔔 Notificações ativas';
+      els.btnNotifyPerm.textContent = 'Notificações ativas';
       els.btnNotifyPerm.disabled = true;
     } else if (Notification.permission === 'denied') {
-      els.btnNotifyPerm.textContent = '🔕 Notificações bloqueadas';
+      els.btnNotifyPerm.textContent = 'Notificações bloqueadas';
       els.btnNotifyPerm.disabled = true;
     } else {
-      els.btnNotifyPerm.textContent = '🔔 Ativar notificações push';
+      els.btnNotifyPerm.textContent = 'Ativar notificações push';
       els.btnNotifyPerm.disabled = false;
     }
   }
@@ -355,13 +311,13 @@
     var sign = data.pctChange > 0 ? '+' : '';
     if (data.pctChange > 0.001) {
       setDeltaClass(els.rateDelta, 'pos');
-      els.rateDelta.textContent = '▲ ' + sign + data.pctChange.toFixed(2) + '%';
+      els.rateDelta.innerHTML = FinancIcons.svg('trending-up', { size: 14 }) + ' ' + sign + data.pctChange.toFixed(2) + '%';
     } else if (data.pctChange < -0.001) {
       setDeltaClass(els.rateDelta, 'neg');
-      els.rateDelta.textContent = '▼ ' + data.pctChange.toFixed(2) + '%';
+      els.rateDelta.innerHTML = FinancIcons.svg('trending-down', { size: 14 }) + ' ' + data.pctChange.toFixed(2) + '%';
     } else {
       setDeltaClass(els.rateDelta, 'warn');
-      els.rateDelta.textContent = '· 0,00%';
+      els.rateDelta.textContent = '0,00%';
     }
 
     var d = new Date(data.timestamp * 1000);
@@ -500,7 +456,7 @@
     els.spark.onpointerleave = onPointerLeave;
   }
 
-  // ---------- Conversor BRL ⇄ Moeda ----------
+  // ---------- Conversor BRL <-> Moeda ----------
 
   function updateConversion() {
     if (!currentQuote) return;
@@ -556,11 +512,11 @@
     renderLog();
 
     if (els.btnAddLog) {
-      var origText = els.btnAddLog.textContent;
-      els.btnAddLog.textContent = '✓ Adicionado ao histórico!';
+      var origHtml = els.btnAddLog.innerHTML;
+      els.btnAddLog.innerHTML = FinancIcons.svg('check', { size: 16 }) + ' Adicionado ao histórico';
       els.btnAddLog.disabled = true;
       setTimeout(function () {
-        els.btnAddLog.textContent = origText;
+        els.btnAddLog.innerHTML = origHtml;
         els.btnAddLog.disabled = false;
       }, 1500);
     }
@@ -574,7 +530,7 @@
     if (!conversionLog.length) {
       var empty = document.createElement('div');
       empty.className = 'empty-note';
-      empty.textContent = 'Nenhuma conversão salva ainda. Clique em [+ Adicionar ao Histórico].';
+      empty.textContent = 'Nenhuma conversão salva ainda. Toque em Adicionar ao histórico.';
       els.logList.appendChild(empty);
       return;
     }
@@ -692,7 +648,7 @@
       btn.setAttribute('aria-pressed', String(isActive));
     });
 
-    els.pairLabel.textContent = cur + ' ⇄ BRL';
+    els.pairLabel.innerHTML = cur + ' ' + FinancIcons.svg('arrow-left-right', { size: 12 }) + ' BRL';
     refreshConverterLabels();
     els.convInput.value = '1,00';
     loadAlertUI(cur);
@@ -720,7 +676,7 @@
     setStatus('');
     if (isManualRefresh) {
       els.refresh.disabled = true;
-      els.refresh.textContent = 'Atualizando…';
+      els.refresh.innerHTML = FinancIcons.svg('refresh', { size: 15, cls: 'fi-spin' }) + ' Atualizando…';
     }
     await fetchLast();
     await fetchDaily(selectedCurrency, selectedPeriod);
@@ -738,7 +694,7 @@
 
     if (isManualRefresh) {
       els.refresh.disabled = false;
-      els.refresh.textContent = 'Atualizar cotação';
+      els.refresh.innerHTML = FinancIcons.svg('refresh', { size: 15 }) + ' Atualizar cotação';
     }
   }
 
@@ -772,7 +728,7 @@
       });
     }
 
-    // Fechar ao clicar no botão '✕'
+    // Fechar ao clicar no botão de fechar
     document.querySelectorAll('[data-close]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var modalId = btn.getAttribute('data-close');
@@ -842,7 +798,7 @@
 
   els.clearLog.addEventListener('click', function () {
     conversionLog = [];
-    localStorage.removeItem(LOG_ENC_KEY);
+    localStorage.removeItem(LOG_KEY);
     renderLog();
   });
 
@@ -855,13 +811,8 @@
   initModals();
   updateNotificationBtnState();
   loadAlertUI(selectedCurrency);
-  loadEncryptedLog();
+  await loadEncryptedLog();
   load(false);
   setInterval(function () { load(false); }, 5 * 60 * 1000);
 
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () {});
-    });
-  }
-})();
+})().catch(error => { alert('Não foi possível abrir os dados: ' + error.message); window.lockVault(); });

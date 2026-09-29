@@ -220,7 +220,7 @@
 
   /**
    * Criptografia e decifragem de dados sensíveis locais (AES-GCM 256 bits via Web Crypto)
-   * Sem necessidade de PIN/senha manual do usuário (chave segura gerada por dispositivo).
+   * Compatibilidade criptográfica para migração do histórico da versão anterior.
    */
   async function encryptData(plainText, key) {
     var cryptoObj = typeof crypto !== 'undefined' ? crypto : (typeof globalThis !== 'undefined' ? globalThis.crypto : null);
