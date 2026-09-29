@@ -121,10 +121,15 @@
     };
   }
 
+  // Faixas plausíveis (R$ por unidade), bem largas: barram cotação adulterada ou quebrada vinda de uma fonte,
+  // sem precisar de atualização frequente.
+  var PLAUSIBLE_BRL = { USD: [1, 30], EUR: [1, 35], GBP: [1, 40], CAD: [0.5, 25], ARS: [0.0001, 0.5], BTC: [10000, 20000000] };
+
   /**
-   * Validação rigorosa do payload retornado pela API de cotação
+   * Validação rigorosa do payload retornado pela API de cotação.
+   * Com o código da moeda, também exige valor dentro da faixa plausível.
    */
-  function validateApiQuote(quote) {
+  function validateApiQuote(quote, code) {
     if (!quote || typeof quote !== 'object') return null;
     var bid = parseFloat(quote.bid);
     var ask = parseFloat(quote.ask);
@@ -133,6 +138,9 @@
 
     if (!Number.isFinite(bid) || bid <= 0) return null;
     if (!Number.isFinite(ask) || ask <= 0) return null;
+    if (ask < bid * 0.5 || ask > bid * 1.5) return null;
+    var range = code && PLAUSIBLE_BRL[code];
+    if (range && (bid < range[0] || bid > range[1])) return null;
     if (!Number.isFinite(pctChange)) pctChange = 0;
     if (!Number.isFinite(timestamp) || timestamp <= 0) timestamp = Math.floor(Date.now() / 1000);
 

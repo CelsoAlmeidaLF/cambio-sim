@@ -89,6 +89,18 @@ describe('CambioEngine - Testes do Motor Financeiro', () => {
     assert.equal(CambioEngine.validateApiQuote({ bid: '-5.0', ask: '5.0' }), null);
   });
 
+  test('validateApiQuote com a moeda barra cotação fora da faixa plausível', () => {
+    const q = (bid, ask = bid) => ({ bid: String(bid), ask: String(ask), pctChange: '0', timestamp: '1720000000' });
+    assert.ok(CambioEngine.validateApiQuote(q(5.42), 'USD'));
+    assert.equal(CambioEngine.validateApiQuote(q(542), 'USD'), null, 'dólar a R$ 542');
+    assert.equal(CambioEngine.validateApiQuote(q(0.05), 'EUR'), null, 'euro a R$ 0,05');
+    assert.ok(CambioEngine.validateApiQuote(q(0.0055), 'ARS'));
+    assert.ok(CambioEngine.validateApiQuote(q(350000, 350500), 'BTC'));
+    assert.equal(CambioEngine.validateApiQuote(q(35), 'BTC'), null, 'bitcoin a R$ 35');
+    assert.equal(CambioEngine.validateApiQuote(q(5.42, 12), 'USD'), null, 'venda muito longe da compra');
+    assert.ok(CambioEngine.validateApiQuote(q(1234)), 'sem moeda, só as regras gerais');
+  });
+
   test('validateConversionLog deve sanitizar strings e respeitar o limite de histórico', () => {
     const maliciousLog = [
       { from: 'USD<script>', to: 'BRL', inputStr: '100<img src=x>', outputStr: '500', ts: 1720000000 },
