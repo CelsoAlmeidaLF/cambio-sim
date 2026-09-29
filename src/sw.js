@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v11';
+const CACHE = 'cambio-app-v1.3.0';
 const ASSETS = [
   './',
   './index.html',
