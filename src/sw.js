@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v7-pin-autofill';
+const CACHE = 'cambio-app-v8-bio-passkey';
 const ASSETS = [
   './',
   './index.html',
