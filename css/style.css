@@ -31,6 +31,17 @@ html, body {
   padding: 24px 18px 60px;
 }
 
+.app-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.app-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .eyebrow {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
