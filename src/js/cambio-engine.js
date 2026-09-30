@@ -27,18 +27,33 @@
   };
 
   /**
-   * Converte string localizada pt-BR ou número para float numérico seguro
+   * Converte string localizada pt-BR (ou número) para float. Aceita apenas formatos inequívocos:
+   *   "5,40" | "1.250,50" | "1250" | "5.40" (ponto decimal, sem vírgula) | "1,234.56" (en-US)
+   * O ponto é milhar somente quando segue o padrão ^[1-9]\d{0,2}(\.\d{3})+$ ("1.234" = 1234; "0.500" = 0,5).
+   * Qualquer outra coisa ("12abc", "1,2,3", "1e3", "5,") devolve NaN em vez de adivinhar.
    */
   function parseLocaleNumber(val) {
     if (typeof val === 'number') {
       return Number.isFinite(val) ? val : NaN;
     }
     if (typeof val !== 'string') return NaN;
-    var cleaned = val.trim();
-    if (!cleaned) return NaN;
-    // Remove separadores de milhares e converte vírgula decimal
-    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-    var num = parseFloat(cleaned);
+    var s = val.trim();
+    if (!s) return NaN;
+    var sign = 1;
+    if (s.charAt(0) === '-') { sign = -1; s = s.slice(1); }
+    var cleaned;
+    if (/^\d+(,\d+)?$/.test(s)) {
+      cleaned = s.replace(',', '.'); // "5,40" | "1250"
+    } else if (/^[1-9]\d{0,2}(\.\d{3})+(,\d+)?$/.test(s)) {
+      cleaned = s.replace(/\./g, '').replace(',', '.'); // "1.250,50" | "1.234"
+    } else if (/^\d+\.\d+$/.test(s)) {
+      cleaned = s; // "5.40" | "1000.50": ponto decimal
+    } else if (/^[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(s)) {
+      cleaned = s.replace(/,/g, ''); // "1,234.56" (en-US)
+    } else {
+      return NaN;
+    }
+    var num = parseFloat(cleaned) * sign;
     return Number.isFinite(num) ? num : NaN;
   }
 
