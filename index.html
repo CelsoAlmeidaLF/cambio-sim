@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="vault-locked" data-vault-version="1.7.1" data-vault-app="cambio-sim" data-vault-name="Câmbio">
+<html lang="pt-BR" class="vault-locked" data-vault-version="1.8.0" data-vault-app="cambio-sim" data-vault-name="Câmbio">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -161,9 +161,10 @@
           </div>
           <div>
             <label class="field-label" for="vet-spread">Spread Bancário (%)</label>
-            <input type="text" id="vet-spread" inputmode="decimal" value="1,50">
+            <input type="text" id="vet-spread" inputmode="decimal" value="5,50" aria-describedby="vet-spread-hint">
           </div>
         </div>
+        <div class="field-hint" id="vet-spread-hint">Padrão estimado para a modalidade. É estimativa de mercado, não é norma: cada instituição define o seu spread.</div>
         <div>
           <label class="field-label" for="vet-iof">Modalidade / Alíquota IOF</label>
           <select id="vet-iof">
@@ -171,19 +172,33 @@
             <option value="cartao">Cartão de Crédito / Débito Internacional (IOF 3,5%)</option>
             <option value="remessa_mesma_titularidade">Conta Internacional Própria (IOF 3,5%)</option>
             <option value="remessa_outra_titularidade">Remessa para Terceiros (IOF 3,5%)</option>
-            <option value="remessa_investimento">Remessa para Investimento (IOF 1,1%)</option>
+            <option value="remessa_investimento">Remessa para Investimento, recursos próprios (IOF 1,1%)</option>
+            <option value="ingresso_recursos">Ingresso de Recursos do Exterior (IOF 0,38%)</option>
             <option value="nenhum">Isento / Sem IOF (0,0%)</option>
           </select>
         </div>
+        <div class="vet-grid">
+          <div>
+            <label class="field-label" for="vet-fee-fixed">Tarifa fixa (R$)</label>
+            <input type="text" id="vet-fee-fixed" inputmode="decimal" value="0,00">
+          </div>
+          <div>
+            <label class="field-label" for="vet-fee-pct">Tarifa percentual (%)</label>
+            <input type="text" id="vet-fee-pct" inputmode="decimal" value="0,00">
+          </div>
+        </div>
+
+        <div class="alert-seed danger" id="vet-error" role="alert"></div>
+        <div id="vet-warnings" class="vet-warnings" aria-live="polite"></div>
 
         <div class="vet-result-card">
           <div class="line">
-            <span>Câmbio com Spread:</span>
-            <strong id="vet-commercial">—</strong>
+            <span>Valor sem spread:</span>
+            <span id="vet-base">—</span>
           </div>
           <div class="line">
-            <span>VET Efetivo (com IOF):</span>
-            <strong id="vet-rate">—</strong>
+            <span>Câmbio com Spread:</span>
+            <strong id="vet-commercial">—</strong>
           </div>
           <div class="line">
             <span>Custo do Spread:</span>
@@ -193,11 +208,20 @@
             <span>Custo do IOF:</span>
             <span id="vet-iof-cost">—</span>
           </div>
+          <div class="line">
+            <span>Tarifas:</span>
+            <span id="vet-fee-cost">—</span>
+          </div>
+          <div class="line">
+            <span>VET (total ÷ quantia):</span>
+            <strong id="vet-rate">—</strong>
+          </div>
           <div class="line highlight">
             <span>Total a Pagar:</span>
             <strong id="vet-total">—</strong>
           </div>
         </div>
+        <p class="vet-disclaimer">VET = total em R$ (câmbio com spread + IOF + tarifas) ÷ quantia em moeda estrangeira, conforme a lógica da Res. BCB 277/2022. Simulação informativa: não é oferta nem orientação tributária. O VET que vale é o informado pela instituição antes de você fechar a operação.</p>
       </div>
     </div>
   </div>
@@ -234,6 +258,11 @@
   <footer>
     FONTE DE DADOS: AwesomeAPI (economia.awesomeapi.com.br)<br>
     Cotações de mercado são informativas e sujeitas a variação contínua.
+    <p class="footer-disclaimer">
+      As simulações não são oferta nem orientação tributária. O VET vinculante é o que a instituição informa antes de fechar a operação.
+      Alíquotas de IOF conforme o Decreto 12.499/2025 (verificado em 30/09/2026). Para criptoativos, remessas a terceiros ou
+      investimento no exterior, consulte um contador ou tributarista.
+    </p>
   </footer>
 </div>
 
