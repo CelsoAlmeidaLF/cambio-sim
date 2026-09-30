@@ -89,7 +89,14 @@
     vetRate: document.getElementById('vet-rate'),
     vetSpreadCost: document.getElementById('vet-spread-cost'),
     vetIofCost: document.getElementById('vet-iof-cost'),
-    vetTotal: document.getElementById('vet-total')
+    vetTotal: document.getElementById('vet-total'),
+    vetFeeFixed: document.getElementById('vet-fee-fixed'),
+    vetFeePct: document.getElementById('vet-fee-pct'),
+    vetBase: document.getElementById('vet-base'),
+    vetFeeCost: document.getElementById('vet-fee-cost'),
+    vetError: document.getElementById('vet-error'),
+    vetWarnings: document.getElementById('vet-warnings'),
+    vetSpreadHint: document.getElementById('vet-spread-hint')
   };
 
   var currentQuote = null;
@@ -99,6 +106,7 @@
   var alertDirDraft = 'above';
 
   var lastData = {};
+  var touristData = {}; // cotação turismo (USD/EUR) da AwesomeAPI, usada como base na espécie
   var lastError = {};
   var dailyData = {};
   var dailyError = {};
@@ -243,6 +251,25 @@
     } catch (err) {
       awesomeDownUntil = Date.now() + AWESOME_RETRY_MS;
       throw err;
+    }
+  }
+
+  // Cotação turismo (par <MOEDA>-BRLT, só USD e EUR). Falha aqui nunca afeta a cotação principal:
+  // sem ela, a espécie usa a comercial + spread padrão de espécie e o simulador avisa.
+  async function fetchTourist() {
+    if (Date.now() < awesomeDownUntil) return;
+    var codes = Object.keys(Engine.TOURIST_PAIRS);
+    var url = 'https://economia.awesomeapi.com.br/json/last/' + codes.map(function (c) { return Engine.TOURIST_PAIRS[c]; }).join(',');
+    try {
+      var payload = await getJson(url, 8000);
+      codes.forEach(function (c) {
+        var key = c + 'BRLT';
+        var validated = payload && Engine.validateTouristQuote(payload[key], c, lastData[c]);
+        if (validated) touristData[c] = validated;
+        else delete touristData[c];
+      });
+    } catch (err) {
+      codes.forEach(function (c) { delete touristData[c]; });
     }
   }
 
@@ -508,9 +535,13 @@
       return;
     }
     var cfg = CURRENCIES[selectedCurrency];
-    var result = Engine.convert(input, currentQuote.bid, convDirection);
-    var outDecimals = convDirection === 'FOREIGN_TO_BRL' ? 4 : cfg.decimals;
-    els.convOutput.value = Engine.fmtBRL(result, 2, outDecimals);
+    // Estrangeira -> BRL usa a compra (bid); BRL -> estrangeira usa a venda (ask). BRL sai com 2 casas.
+    var result = Engine.convertQuoted(input, currentQuote, convDirection, cfg.decimals);
+    if (!result) {
+      els.convOutput.value = '—';
+      return;
+    }
+    els.convOutput.value = Engine.fmtBRL(result.value, 2, convDirection === 'FOREIGN_TO_BRL' ? 2 : cfg.decimals);
   }
 
   function refreshConverterLabels() {
@@ -539,7 +570,7 @@
 
     var fromLabel = convDirection === 'FOREIGN_TO_BRL' ? selectedCurrency : 'BRL';
     var toLabel = convDirection === 'FOREIGN_TO_BRL' ? 'BRL' : selectedCurrency;
-    var inputStr = Engine.fmtBRL(input, 2, convDirection === 'FOREIGN_TO_BRL' ? CURRENCIES[selectedCurrency].decimals : 4);
+    var inputStr = Engine.fmtBRL(input, 2, convDirection === 'FOREIGN_TO_BRL' ? CURRENCIES[selectedCurrency].decimals : 2);
     var entry = {
       from: fromLabel,
       to: toLabel,
@@ -607,26 +638,89 @@
 
   // ---------- Simulador VET (Valor Efetivo Total) ----------
 
+  var vetSpreadTouched = false; // o usuário editou o spread: não sobrescrever com o padrão da modalidade
+  var VET_RESULT_EMPTY = ['vetBase', 'vetCommercial', 'vetRate', 'vetSpreadCost', 'vetIofCost', 'vetFeeCost', 'vetTotal'];
+
+  function clearVetResults() {
+    VET_RESULT_EMPTY.forEach(function (k) { els[k].textContent = '—'; });
+  }
+
+  function showVetError(msg) {
+    els.vetError.textContent = msg;
+    els.vetError.classList.toggle('show', !!msg);
+  }
+
+  function renderVetWarnings(list) {
+    while (els.vetWarnings.firstChild) els.vetWarnings.removeChild(els.vetWarnings.firstChild);
+    list.forEach(function (w) {
+      var box = document.createElement('div');
+      box.className = w.level === 'info' ? 'vet-info' : 'alert-seed show warn-box';
+      box.textContent = w.text;
+      els.vetWarnings.appendChild(box);
+    });
+  }
+
+  function setVetInputsDisabled(disabled) {
+    [els.vetAmount, els.vetSpread, els.vetIof, els.vetFeeFixed, els.vetFeePct].forEach(function (el) { el.disabled = disabled; });
+  }
+
   function updateVET() {
     if (!currentQuote) return;
-    var amount = Engine.parseLocaleNumber(els.vetAmount.value) || 1000;
+    var mode = els.vetIof.value || 'especie';
+    var avail = Engine.vetAvailability(selectedCurrency);
+    setVetInputsDisabled(!avail.ok);
+    if (!avail.ok) {
+      clearVetResults();
+      showVetError('');
+      renderVetWarnings(Engine.getVetWarnings({ currency: selectedCurrency, mode: mode }));
+      return;
+    }
+
+    // Base: espécie usa a cotação turismo (venda) quando houver; senão, a venda comercial.
+    var tourist = mode === 'especie' ? touristData[selectedCurrency] : null;
+    var touristMissing = mode === 'especie' && !tourist;
+    if (!vetSpreadTouched) {
+      els.vetSpread.value = Engine.fmtBRL(Engine.defaultSpreadPercent(mode, { touristBase: !!tourist }), 2, 2);
+    }
+    renderVetWarnings(Engine.getVetWarnings({
+      currency: selectedCurrency, mode: mode, quote: currentQuote, touristUsed: !!tourist, touristMissing: touristMissing
+    }));
+
+    // Validação explícita: nada de valores padrão em silêncio.
+    var amount = Engine.parseLocaleNumber(els.vetAmount.value);
     var spread = Engine.parseLocaleNumber(els.vetSpread.value);
-    if (isNaN(spread) || spread < 0) spread = 1.5;
-    var iof = els.vetIof.value || 'especie';
+    var feeFixed = Engine.parseLocaleNumber(els.vetFeeFixed.value || '0');
+    var feePct = Engine.parseLocaleNumber(els.vetFeePct.value || '0');
+    var lim = Engine.LIMITS;
+    var err = '';
+    if (!(amount > 0)) err = 'Informe uma quantia maior que zero (ex.: 1.000,00).';
+    else if (amount > lim.amountMax) err = 'Quantia acima do limite aceito.';
+    else if (!Number.isFinite(spread) || spread < 0 || spread > lim.spreadMax) err = 'Spread inválido: informe um percentual entre 0 e ' + lim.spreadMax + ' (ex.: 1,50).';
+    else if (!Number.isFinite(feeFixed) || feeFixed < 0 || feeFixed > lim.feeFixedMax) err = 'Tarifa fixa inválida: informe um valor em R$ maior ou igual a zero.';
+    else if (!Number.isFinite(feePct) || feePct < 0 || feePct > lim.feePercentMax) err = 'Tarifa percentual inválida: informe entre 0 e ' + lim.feePercentMax + '.';
 
-    var res = Engine.calculateVET({
+    var res = err ? null : Engine.calculateVET({
+      currency: selectedCurrency,
       amountForeign: amount,
-      baseRate: currentQuote.ask || currentQuote.bid,
+      baseRate: tourist ? tourist.ask : (currentQuote.ask || currentQuote.bid),
       spreadPercent: spread,
-      iofRate: iof
+      iofRate: mode,
+      feeFixedBrl: feeFixed,
+      feePercent: feePct
     });
+    if (!res) {
+      showVetError(err || 'Não foi possível calcular com os valores informados.');
+      clearVetResults();
+      return;
+    }
+    showVetError('');
 
-    if (!res) return;
-
+    els.vetBase.textContent = 'R$ ' + Engine.fmtBRL(res.baseBrl, 2, 2);
     els.vetCommercial.textContent = 'R$ ' + Engine.fmtBRL(res.commercialWithSpread, 2, 4);
     els.vetRate.textContent = 'R$ ' + Engine.fmtBRL(res.vetRate, 2, 4);
     els.vetSpreadCost.textContent = 'R$ ' + Engine.fmtBRL(res.spreadCostBrl, 2, 2);
     els.vetIofCost.textContent = 'R$ ' + Engine.fmtBRL(res.iofCostBrl, 2, 2);
+    els.vetFeeCost.textContent = 'R$ ' + Engine.fmtBRL(res.feeCostBrl, 2, 2);
     els.vetTotal.textContent = 'R$ ' + Engine.fmtBRL(res.totalBrl, 2, 2);
   }
 
@@ -721,6 +815,7 @@
       els.refresh.innerHTML = FinancIcons.svg('refresh', { size: 15, cls: 'fi-spin' }) + ' Atualizando…';
     }
     await fetchLast();
+    await fetchTourist();
     await fetchDaily(selectedCurrency, selectedPeriod);
     render(selectedCurrency);
 
@@ -847,8 +942,11 @@
   });
 
   els.vetAmount.addEventListener('input', updateVET);
-  els.vetSpread.addEventListener('input', updateVET);
-  els.vetIof.addEventListener('change', updateVET);
+  els.vetSpread.addEventListener('input', function () { vetSpreadTouched = true; updateVET(); });
+  els.vetFeeFixed.addEventListener('input', updateVET);
+  els.vetFeePct.addEventListener('input', updateVET);
+  // Trocar a modalidade volta o spread ao padrão daquela modalidade (estimativa de mercado).
+  els.vetIof.addEventListener('change', function () { vetSpreadTouched = false; updateVET(); });
 
   // ---------- Inicialização ----------
 

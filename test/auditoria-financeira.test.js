@@ -250,3 +250,26 @@ describe('B11 / B13 / B14 - avisos por modalidade', () => {
     assert.equal(texts({ currency: 'USD', mode: 'remessa_mesma_titularidade' }), '');
   });
 });
+
+describe('B14 - validação da cotação turismo', () => {
+  const raw = (bid, ask) => ({ bid: String(bid), ask: String(ask), pctChange: '0', timestamp: '1790777366', name: 'Dólar Americano/Real Brasileiro Turismo' });
+  const commercial = { ask: 5.183 };
+  test('só USD e EUR têm par turismo', () => {
+    assert.deepEqual(Object.keys(E.TOURIST_PAIRS).sort(), ['EUR', 'USD']);
+    assert.equal(E.TOURIST_PAIRS.USD, 'USD-BRLT');
+    assert.equal(E.validateTouristQuote(raw(5.14, 5.54), 'GBP', { ask: 5.5 }), null);
+  });
+  test('aceita turismo plausível e rejeita fora da faixa em relação ao comercial', () => {
+    assert.equal(E.validateTouristQuote(raw(5.14438, 5.5469), 'USD', commercial).ask, 5.5469);
+    assert.equal(E.validateTouristQuote(raw(5.14, 9.5), 'USD', commercial), null);
+    assert.equal(E.validateTouristQuote(raw(5.14, 4.0), 'USD', commercial), null);
+    assert.equal(E.validateTouristQuote({ bid: 'x' }, 'USD', commercial), null);
+    assert.equal(E.validateTouristQuote(null, 'USD', commercial), null);
+  });
+  test('espécie com base turismo usa a venda turismo no VET com spread adicional 0', () => {
+    const t = E.validateTouristQuote(raw(5.14438, 5.5469), 'USD', commercial);
+    const r = E.calculateVET({ currency: 'USD', amountForeign: 100, baseRate: t.ask, spreadPercent: E.defaultSpreadPercent('especie', { touristBase: true }), iofRate: 'especie' });
+    assert.equal(r.subtotalBrl, 554.69);
+    assert.equal(r.iofCostBrl, 19.41); // 19,41415
+  });
+});

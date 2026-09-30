@@ -346,6 +346,23 @@
     };
   }
 
+  // Cotação turismo da AwesomeAPI (par <MOEDA>-BRLT): só existe para USD e EUR.
+  var TOURIST_PAIRS = { USD: 'USD-BRLT', EUR: 'EUR-BRLT' };
+
+  /**
+   * Valida a cotação turismo (venda maior que a comercial, mas dentro de uma faixa sã).
+   * Devolve a cotação normalizada ou null (o chamador cai no comercial + spread padrão).
+   */
+  function validateTouristQuote(raw, code, commercial) {
+    if (!TOURIST_PAIRS[code]) return null;
+    var q = validateApiQuote(raw, code);
+    if (!q) return null;
+    if (commercial && Number.isFinite(commercial.ask) && commercial.ask > 0) {
+      if (q.ask < commercial.ask * 0.98 || q.ask > commercial.ask * 1.3) return null;
+    }
+    return q;
+  }
+
   /**
    * Avalia condição de alerta configurada
    * @param {Object} alert - { value: number, dir: 'above'|'below' }
@@ -469,6 +486,8 @@
     convert: convert,
     calculateVET: calculateVET,
     validateApiQuote: validateApiQuote,
+    TOURIST_PAIRS: TOURIST_PAIRS,
+    validateTouristQuote: validateTouristQuote,
     checkAlertCondition: checkAlertCondition,
     validateConversionLog: validateConversionLog,
     validateAlerts: validateAlerts,
