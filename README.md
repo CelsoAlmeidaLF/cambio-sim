@@ -33,10 +33,10 @@ O **Câmbio** é um aplicativo financeiro responsivo desenvolvido com foco em de
   - Séries históricas de **7 Dias**, **30 Dias**, **90 Dias** e **1 Ano**.
   - Renderização vetorial SVG com gradientes e tooltip interativo ao passar o cursor ou o dedo sobre os pontos históricos.
 - **Conversor Rápido Bidirecional**:
-  - Conversão instantânea de moeda estrangeira para BRL ou de BRL para moeda estrangeira com botão de inversão rápida (`⇄`).
+  - Conversão instantânea de moeda estrangeira para BRL (pela compra) ou de BRL para moeda estrangeira (pela venda) com botão de inversão rápida (`⇄`).
   - Histórico das últimas conversões mantido localmente.
 - **Simulador de VET (Custo Efetivo Real)**:
-  - Permite ao usuário simular compras de moeda para viagem, cartões internacionais ou transferências bancárias, discriminando o impacto do **Spread bancário** e do **IOF**.
+  - Permite ao usuário simular compras de moeda para viagem, cartões internacionais ou transferências bancárias, discriminando o impacto do **Spread bancário**, do **IOF** e das **tarifas**.
 - **Alertas de Cotação & Web Notifications**:
   - Disparo de avisos visuais e notificações push no navegador quando a cotação romper o limite mínimo ou máximo configurado pelo usuário.
 - **PWA & Suporte Offline**:
@@ -66,19 +66,40 @@ O **Câmbio** é um aplicativo financeiro responsivo desenvolvido com foco em de
 
 ## Simulador VET (Valor Efetivo Total)
 
-O VET é calculado de acordo com as normas cambiais do Banco Central do Brasil:
+O VET é o custo total em reais dividido pela quantia em moeda estrangeira, incluindo tarifas e tributos (lógica da Res. BCB 277/2022):
 
-$$VET = \text{Taxa Base} \times (1 + \text{Spread}_{\%}) \times (1 + IOF)$$
+```
+Câmbio com spread = Cotação de venda × (1 + Spread%)
+IOF               = Câmbio com spread × alíquota
+Tarifas           = tarifa fixa (R$) + tarifa % × Câmbio com spread
+Total a pagar     = Câmbio com spread + IOF + Tarifas
+VET               = Total a pagar ÷ quantia em moeda estrangeira
+```
 
-### Tabela de Alíquotas de IOF configuradas (Decreto 12.499/2025, vigente desde 11/06/2025):
+- Os cálculos usam aritmética decimal exata e só o resultado final é arredondado a centavos (meio para cima). As parcelas fecham com o total: valor sem spread + spread + IOF + tarifas = total.
+- Escalas: **spread e tarifa percentual em %** (1,5 = 1,5%); **alíquota de IOF em decimal** (0,035 = 3,5%). Spread aceito de 0 a 20%; alíquota de 0 a 0,1. Entrada inválida mostra erro (nenhum valor padrão é aplicado em silêncio).
+- **Spread padrão por modalidade** (estimativa de mercado, não norma; cada instituição define o seu): espécie 5,5%, cartão 4%, conta/remessa 2%, investimento e ingresso 1,5%. Ao trocar a modalidade, o spread volta ao padrão dela.
+- **Espécie**: usa a cotação turismo (venda) da AwesomeAPI (`USD-BRLT`, `EUR-BRLT`) quando disponível; ela já embute a margem da espécie e o spread adicional padrão passa a 0%. Para as demais moedas ou se a cotação falhar, usa a comercial + spread padrão de espécie e avisa.
+- **Bitcoin**: o simulador VET fica bloqueado (incidência de IOF sobre criptoativos a confirmar com tributarista; Res. BCB 519 a 521/2025).
+- **Fonte reserva**: se a cotação veio da fonte reserva (média diária, sem compra/venda), o modal exibe aviso.
+- **Cartão**: aviso de que a conversão depende do fechamento/pagamento da fatura.
+- **Conversor**: estrangeira para BRL usa a compra (bid); BRL para estrangeira usa a venda (ask). O resultado em R$ sai com 2 casas.
+- **Números digitados**: `5,40`, `5.40`, `1.250,50` e `1,234.56` são aceitos; ponto seguido de exatamente 3 dígitos (`1.234`) é milhar; texto inválido (`12abc`) é rejeitado.
+
+### Tabela de Alíquotas de IOF configuradas (Decreto 12.499/2025, vigente desde 11/06/2025; verificado em 30/09/2026):
 | Modalidade | Alíquota de IOF |
 | :--- | :--- |
 | Moeda em Espécie | **3,50%** |
 | Cartão Internacional (Crédito/Débito) | **3,50%** |
 | Conta Internacional Própria (mesma titularidade) | **3,50%** |
 | Remessa Internacional para Terceiros | **3,50%** |
-| Remessa para Investimento no Exterior | **1,10%** |
+| Remessa para Investimento no Exterior (recursos próprios do residente; a instituição pode exigir declaração da finalidade) | **1,10%** |
+| Ingresso de recursos do exterior (inciso XXV; enquadramento a confirmar) | **0,38%** |
 | Isenção / Comercial Puro | **0,00%** |
+
+> Aviso: as simulações não são oferta nem orientação tributária. O VET vinculante é o informado pela instituição antes de fechar a operação. Para criptoativos, remessas a terceiros ou investimento, consulte um contador ou tributarista.
+>
+> Histórico de correções: veja [docs/auditoria-financeira-2026-09.md](docs/auditoria-financeira-2026-09.md).
 
 ---
 
@@ -88,8 +109,13 @@ $$VET = \text{Taxa Base} \times (1 + \text{Spread}_{\%}) \times (1 + IOF)$$
 cambio-sim/
 ├── LICENSE
 ├── README.md
+├── docs/
+│   └── auditoria-financeira-2026-09.md
 ├── test/
-│   └── cambio-engine.test.js     # Suíte de testes automatizados (Node.js nativo)
+│   ├── cambio-engine.test.js     # Testes do motor financeiro (Node.js nativo)
+│   ├── auditoria-financeira.test.js  # Testes das correções da auditoria de 30/09/2026
+│   ├── app-ui.test.js            # Integração da interface com DOM falso
+│   └── ...                       # quote-sources, financ-id, HTML/versão
 └── src/
     ├── index.html                # Ponto de entrada PWA com CSP
     ├── cambio-app.html           # Espelho de compatibilidade
@@ -109,7 +135,7 @@ cambio-sim/
 O projeto conta com suíte de testes unitários nativa (sem dependências externas):
 
 ```bash
-node --test test/cambio-engine.test.js
+node --test test/
 ```
 
 Os testes cobrem:
@@ -117,6 +143,8 @@ Os testes cobrem:
 - Cálculos de VET, custos de IOF e Spreads bancários.
 - Validação e sanitização de dados do `localStorage` e payloads de API externa.
 - Verificação de disparos de alertas.
+- Parse numérico estrito, arredondamento half-up, fechamento das parcelas do VET, validação de entradas e bloqueio de BTC.
+- Interface (conversor e modal VET) com DOM falso.
 
 ---
 
