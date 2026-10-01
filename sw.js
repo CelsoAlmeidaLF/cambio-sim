@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v1.8.0';
+const CACHE = 'cambio-app-v1.9.0';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,10 @@ const ASSETS = [
   './financ-icons.js',
   './cambio-icon-192.png',
   './cambio-icon-512.png',
+  './apoio/apoio.css',
+  './apoio/doacao.js',
+  './apoio/feedback.js',
+  './apoio/qrcode.js',
   './fonts/fonts.css',
   './fonts/ibm-plex-mono-latin-400.woff2',
   './fonts/ibm-plex-mono-latin-500.woff2',
