@@ -787,7 +787,7 @@ footer {
   color: var(--ink-dim);
 }
 
-/* Ícones SVG (financ-icons.js) */
+/* Ícones SVG (stk-pkg-financ-icons.js) */
 .btn-seed, .alert-dir-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .hero-delta-seed { align-items: center; gap: 6px; }
 .pair-label { display: inline-flex; align-items: center; gap: 4px; }
