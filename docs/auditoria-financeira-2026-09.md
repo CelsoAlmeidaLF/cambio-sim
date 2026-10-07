@@ -136,7 +136,7 @@ Pendências de validação (contador: 5):
 ## Outras alterações
 - `README.md`: seção do simulador VET (fórmula, escalas, spreads padrão, turismo, BTC, parse), tabela de IOF (0,38%, nota do 1,1%), estrutura e comando de testes.
 - Estilos novos em `src/css/style.css` (`.field-hint`, `.vet-warnings`, `.vet-disclaimer`, `.footer-disclaimer`).
-- Não alterados: `../.security/`, `../.documents/`, arquivos `secure-*` de `src/`, alíquotas do Decreto 12.499/2025 (3,5% e 1,1%), base na cotação de venda, faixas plausíveis de cotação, `quote-sources.js`.
+- Não alterados: `../stk-pkg-security/`, `../.documents/`, arquivos `secure-*` de `src/`, alíquotas do Decreto 12.499/2025 (3,5% e 1,1%), base na cotação de venda, faixas plausíveis de cotação, `quote-sources.js`.
 
 ## Pontos de atenção (fora do escopo)
 - A cotação da fonte reserva (currency-api) continua com bid = ask; o aviso mitiga, mas não elimina a limitação.

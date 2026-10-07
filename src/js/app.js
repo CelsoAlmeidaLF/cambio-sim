@@ -894,59 +894,80 @@
     });
   }
 
-  // ---------- Event Listeners ----------
+  // ---------- Dicionário de Eventos UI ----------
+  var UiEvents = {
+    refresh_click: function () { load(true); },
+    convInput_input: function () { updateConversion(); },
+    convInvert_click: toggleConvDirection,
+    currencyTabs_click: function (e) {
+      var btn = e.target.closest('.tab-btn-seed');
+      if (btn && btn.getAttribute('data-cur')) {
+        setCurrency(btn.getAttribute('data-cur'));
+      }
+    },
+    per7d_click: function () { setPeriod('7D'); },
+    per30d_click: function () { setPeriod('30D'); },
+    per90d_click: function () { setPeriod('90D'); },
+    per1a_click: function () { setPeriod('1A'); },
+    alertDirAbove_click: function () {
+      alertDirDraft = 'above';
+      els.alertDirAbove.classList.add('active');
+      els.alertDirBelow.classList.remove('active');
+    },
+    alertDirBelow_click: function () {
+      alertDirDraft = 'below';
+      els.alertDirBelow.classList.add('active');
+      els.alertDirAbove.classList.remove('active');
+    },
+    alertSave_click: saveAlert,
+    alertClear_click: clearAlert,
+    btnNotifyPerm_click: requestNotificationPermission,
+    btnAddLog_click: handleAddCurrentConversion,
+    clearLog_click: function () {
+      conversionLog = [];
+      localStorage.removeItem(LOG_KEY);
+      renderLog();
+    },
+    vetAmount_input: updateVET,
+    vetSpread_input: function () { vetSpreadTouched = true; updateVET(); },
+    vetFeeFixed_input: updateVET,
+    vetFeePct_input: updateVET,
+    vetIof_change: function () { vetSpreadTouched = false; updateVET(); }
+  };
 
-  els.refresh.addEventListener('click', function () { load(true); });
-  els.convInput.addEventListener('input', function () { updateConversion(); });
-  els.convInvert.addEventListener('click', toggleConvDirection);
+  // ---------- Vinculação de Eventos (Binder) ----------
+  function bindEvents() {
+    els.refresh.addEventListener('click', UiEvents.refresh_click);
+    els.convInput.addEventListener('input', UiEvents.convInput_input);
+    els.convInvert.addEventListener('click', UiEvents.convInvert_click);
+    els.currencyTabs.addEventListener('click', UiEvents.currencyTabs_click);
+    els.per7d.addEventListener('click', UiEvents.per7d_click);
+    els.per30d.addEventListener('click', UiEvents.per30d_click);
+    els.per90d.addEventListener('click', UiEvents.per90d_click);
+    els.per1a.addEventListener('click', UiEvents.per1a_click);
+    els.alertDirAbove.addEventListener('click', UiEvents.alertDirAbove_click);
+    els.alertDirBelow.addEventListener('click', UiEvents.alertDirBelow_click);
+    els.alertSave.addEventListener('click', UiEvents.alertSave_click);
+    els.alertClear.addEventListener('click', UiEvents.alertClear_click);
 
-  els.currencyTabs.addEventListener('click', function (e) {
-    var btn = e.target.closest('.tab-btn-seed');
-    if (btn && btn.getAttribute('data-cur')) {
-      setCurrency(btn.getAttribute('data-cur'));
+    if (els.btnNotifyPerm) {
+      els.btnNotifyPerm.addEventListener('click', UiEvents.btnNotifyPerm_click);
     }
-  });
+    if (els.btnAddLog) {
+      els.btnAddLog.addEventListener('click', UiEvents.btnAddLog_click);
+    }
 
-  els.per7d.addEventListener('click', function () { setPeriod('7D'); });
-  els.per30d.addEventListener('click', function () { setPeriod('30D'); });
-  els.per90d.addEventListener('click', function () { setPeriod('90D'); });
-  els.per1a.addEventListener('click', function () { setPeriod('1A'); });
+    els.clearLog.addEventListener('click', UiEvents.clearLog_click);
 
-  els.alertDirAbove.addEventListener('click', function () {
-    alertDirDraft = 'above';
-    els.alertDirAbove.classList.add('active');
-    els.alertDirBelow.classList.remove('active');
-  });
-
-  els.alertDirBelow.addEventListener('click', function () {
-    alertDirDraft = 'below';
-    els.alertDirBelow.classList.add('active');
-    els.alertDirAbove.classList.remove('active');
-  });
-
-  els.alertSave.addEventListener('click', saveAlert);
-  els.alertClear.addEventListener('click', clearAlert);
-
-  if (els.btnNotifyPerm) {
-    els.btnNotifyPerm.addEventListener('click', requestNotificationPermission);
+    els.vetAmount.addEventListener('input', UiEvents.vetAmount_input);
+    els.vetSpread.addEventListener('input', UiEvents.vetSpread_input);
+    els.vetFeeFixed.addEventListener('input', UiEvents.vetFeeFixed_input);
+    els.vetFeePct.addEventListener('input', UiEvents.vetFeePct_input);
+    els.vetIof.addEventListener('change', UiEvents.vetIof_change);
   }
 
-  if (els.btnAddLog) {
-    els.btnAddLog.addEventListener('click', handleAddCurrentConversion);
-  }
-
-  els.clearLog.addEventListener('click', function () {
-    conversionLog = [];
-    localStorage.removeItem(LOG_KEY);
-    renderLog();
-  });
-
-  els.vetAmount.addEventListener('input', updateVET);
-  els.vetSpread.addEventListener('input', function () { vetSpreadTouched = true; updateVET(); });
-  els.vetFeeFixed.addEventListener('input', updateVET);
-  els.vetFeePct.addEventListener('input', updateVET);
-  // Trocar a modalidade volta o spread ao padrão daquela modalidade (estimativa de mercado).
-  els.vetIof.addEventListener('change', function () { vetSpreadTouched = false; updateVET(); });
+  // ---------- Inicialização ----------
+  bindEvents();
 
   // ---------- Inicialização ----------
 
