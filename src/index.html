@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="vault-locked" data-vault-version="1.9.1" data-vault-app="cambio-sim" data-vault-name="Câmbio">
+<html lang="pt-BR" class="vault-locked" data-vault-version="1.11.0" data-vault-app="cambio-sim" data-vault-name="Câmbio">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -10,9 +10,11 @@
 <link rel="icon" href="cambio-icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="cambio-icon-512.png">
 <title>Câmbio — Moedas & Simulador VET</title>
+<!-- Log de erros: primeiro script, para pegar erros desde o início -->
+<script src="apoio/stk-pkg-erros.js" data-app="CAMBIO"></script>
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="secure-ui.css">
+<link rel="stylesheet" href="stk-pkg-secure-ui.css">
 <link rel="stylesheet" href="apoio/apoio.css" id="dz-style">
 </head>
 <body>
@@ -269,11 +271,11 @@
 
 <script src="js/cambio-engine.js"></script>
 <script src="js/quote-sources.js"></script>
-<script src="financ-icons.js"></script>
-<script src="secure-vault.js"></script>
-<script src="secure-ui.js"></script>
+<script src="stk-pkg-financ-icons.js"></script>
+<script src="stk-pkg-secure-vault.js"></script>
+<script src="stk-pkg-secure-ui.js"></script>
 <script src="js/app.js"></script>
-<script src="apoio/feedback.js"></script>
-<script src="apoio/doacao.js" data-app="CAMBIO" data-flutuante="false"></script>
+<script src="apoio/stk-pkg-feedback.js"></script>
+<script src="apoio/stk-pkg-doacao.js" data-app="CAMBIO" data-flutuante="false"></script>
 </body>
 </html>

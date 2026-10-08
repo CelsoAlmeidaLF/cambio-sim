@@ -1,4 +1,4 @@
-/** Verificações estáticas do HTML/versão (disclaimer, campos novos, versão 1.9.1 consistente). */
+/** Verificações estáticas do HTML/versão (disclaimer, campos novos, versão 1.11.0 consistente). */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -7,10 +7,10 @@ const path = require('node:path');
 const read = (f) => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8');
 const html = read('index.html');
 
-test('versão 1.9.1 no HTML, no espelho e no cache do service worker', () => {
-  assert.match(html, /data-vault-version="1\.9\.1"/);
-  assert.match(read('cambio-app.html'), /data-vault-version="1\.9\.1"/);
-  assert.match(read('sw.js'), /cambio-app-v1\.9\.1/);
+test('versão 1.11.0 no HTML, no espelho e no cache do service worker', () => {
+  assert.match(html, /data-vault-version="1\.11\.0"/);
+  assert.match(read('cambio-app.html'), /data-vault-version="1\.11\.0"/);
+  assert.match(read('sw.js'), /cambio-app-v1\.11\.0/);
 });
 
 test('cambio-app.html continua espelho de index.html', () => {

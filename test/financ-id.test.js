@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
-// Roda tanto em .security/test quanto em <app>/test (o kit fica em <app>/src).
-const kit = ['../secure-vault.js', '../src/secure-vault.js'].map(p => path.join(__dirname, p)).find(p => fs.existsSync(p));
+// Roda tanto em stk-pkg-security/test quanto em <app>/test (o kit fica em <app>/src).
+const kit = ['../stk-pkg-secure-vault.js', '../src/stk-pkg-secure-vault.js'].map(p => path.join(__dirname, p)).find(p => fs.existsSync(p));
 const { Vault, protect, recoveryCode } = require(kit);
 
 class MemoryStorage {
