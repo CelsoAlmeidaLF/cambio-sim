@@ -10,6 +10,7 @@
 - [Funcionalidades Principais](#funcionalidades-principais)
 - [Segurança & Hardening](#segurança--hardening)
 - [Simulador VET (Valor Efetivo Total)](#simulador-vet-valor-efetivo-total)
+- [Apoio, avaliação e log de erros](#apoio-avaliação-e-log-de-erros)
 - [Arquitetura & Estrutura](#arquitetura--estrutura)
 - [Testes Automatizados](#testes-automatizados)
 - [Como Executar](#como-executar)
@@ -103,6 +104,16 @@ VET               = Total a pagar ÷ quantia em moeda estrangeira
 
 ---
 
+## Apoio, avaliação e log de erros
+
+- `src/apoio/` traz cópias de `PACOTES/stk-pkg-doacao/shared/` (não editar aqui), com id `CAMBIO`.
+- **Menu ⋮ → Apoiar · Avaliar · Sugerir:** doação (Pix e Bitcoin), nota de 1 a 5 e sugestão. Vai para o Firestore `systekna-feedback`, protegido por App Check.
+- **Configurações → Relatórios de erro** (`stk-pkg-erros.js`, primeiro script do `<head>`): guarda no aparelho os últimos erros. Valores, e-mails, textos e parâmetros de URL viram `***` antes de guardar. Dá para ver, copiar, enviar e limpar.
+- **Envio só com permissão:** com o **Modo testador** ligado (vale para todos os apps do aparelho), o app envia sozinho. Desligado, pergunta "Enviar relatório?" uma vez por sessão. O dono lê na aba **Erros** do painel de feedback.
+- Nenhum dado financeiro sai do aparelho. Só a avaliação, a sugestão e o relatório técnico de erro são enviados.
+
+---
+
 ## Arquitetura & Estrutura
 
 ```
@@ -115,18 +126,29 @@ cambio-sim/
 │   ├── cambio-engine.test.js     # Testes do motor financeiro (Node.js nativo)
 │   ├── auditoria-financeira.test.js  # Testes das correções da auditoria de 30/09/2026
 │   ├── app-ui.test.js            # Integração da interface com DOM falso
-│   └── ...                       # quote-sources, financ-id, HTML/versão
+│   ├── quote-sources.test.js     # Fontes de cotação e fonte reserva
+│   ├── financ-id.test.js         # PIN e certificado FINANC compartilhados
+│   ├── release-html.test.js      # Versão igual no HTML, no espelho e no service worker
+│   ├── apoio.test.js             # Painel de apoio: CSP, Firebase e App Check
+│   └── stk-pkg-erros.test.js     # Log de erros: limpeza antes do envio
 └── src/
     ├── index.html                # Ponto de entrada PWA com CSP
     ├── cambio-app.html           # Espelho de compatibilidade
     ├── manifest.json             # Manifesto PWA
-    ├── sw.js                     # Service Worker v2 (Cache e offline)
+    ├── sw.js                     # Service Worker (cache com a versão do app, offline)
+    ├── stk-pkg-secure-vault.js   # Cofre AES-GCM (cópia de PACOTES/stk-pkg-security)
+    ├── stk-pkg-secure-ui.js/.css # PIN, bloqueio e Configurações (cópia)
+    ├── stk-pkg-financ-icons.js   # Ícones (cópia)
+    ├── apoio/                    # Painel de apoio e log de erros (cópia de PACOTES/stk-pkg-doacao)
     ├── css/
     │   └── style.css             # Design tokens e folhas de estilo
     └── js/
         ├── cambio-engine.js      # Motor financeiro desacoplado e funções puras
+        ├── quote-sources.js      # Fontes reserva de cotação (currency-api, Frankfurter, Binance)
         └── app.js                # Controlador de UI, DOM e eventos
 ```
+
+Versão atual: **1.11.0**. Ao mudar o app, troque `data-vault-version` no `index.html` e no `cambio-app.html` e o `CACHE` do `sw.js`.
 
 ---
 
@@ -145,7 +167,9 @@ Os testes cobrem:
 - Verificação de disparos de alertas.
 - Parse numérico estrito, arredondamento half-up, fechamento das parcelas do VET, validação de entradas e bloqueio de BTC.
 - Interface (conversor e modal VET) com DOM falso.
+- Versão consistente entre HTML e service worker, CSP do painel de apoio e limpeza do log de erros.
 
+Situação em 08/10/2026: 96 testes passando.
 ---
 
 ## Como Executar
