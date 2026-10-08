@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v1.10.0';
+const CACHE = 'cambio-app-v1.11.0';
 const ASSETS = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const ASSETS = [
   './apoio/apoio.css',
   './apoio/stk-pkg-doacao.js',
   './apoio/stk-pkg-feedback.js',
+  './apoio/stk-pkg-erros.js',
   './apoio/stk-pkg-qrcode.js',
   './fonts/fonts.css',
   './fonts/ibm-plex-mono-latin-400.woff2',
