@@ -8,9 +8,9 @@ const read = (f) => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8'
 const html = read('index.html');
 
 test('versão 1.15.0 no HTML, no espelho e no cache do service worker', () => {
-  assert.match(html, /data-vault-version="1\.15\.0"/);
-  assert.match(read('cambio-app.html'), /data-vault-version="1\.15\.0"/);
-  assert.match(read('sw.js'), /cambio-app-v1\.15\.0/);
+  assert.match(html, /data-vault-version="1\.15\.1"/);
+  assert.match(read('cambio-app.html'), /data-vault-version="1\.15\.1"/);
+  assert.match(read('sw.js'), /cambio-app-v1\.15\.1/);
 });
 
 test('cambio-app.html continua espelho de index.html', () => {
