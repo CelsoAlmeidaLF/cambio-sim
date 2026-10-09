@@ -4,7 +4,8 @@ const path = require('node:path');
 const fs = require('node:fs');
 // Roda tanto em stk-pkg-security/test quanto em <app>/test (o kit fica em <app>/src).
 const kit = ['../stk-pkg-secure-vault.js', '../src/stk-pkg-secure-vault.js'].map(p => path.join(__dirname, p)).find(p => fs.existsSync(p));
-const { Vault, protect, recoveryCode } = require(kit);
+const { Vault, protect, recoveryCode, seed } = require(kit);
+const wordlist = require(path.join(path.dirname(kit), 'stk-pkg-bip39-pt.js'));
 
 class MemoryStorage {
   constructor() { this.data = new Map(); }
@@ -39,12 +40,23 @@ async function protectRecovery(value, secret, context) {
   return { format: 'financ-encrypted-v1', context, iterations: 600000, salt: b64(salt), iv: b64(iv), ciphertext: b64(new Uint8Array(ciphertext)) };
 }
 const envelopeOf = (storage, appId) => JSON.parse(storage.getItem('financ-vault-v1:' + appId));
+// FINANC ID no formato até a v1.6 (código de recuperação de 8 blocos, sem as 12 palavras).
+async function legacyIdentity(storage, pin, code = recoveryCode()) {
+  const master = b64(crypto.getRandomValues(new Uint8Array(32)));
+  storage.setItem('financ-id-v1', JSON.stringify({ version: 1, uid: 'u1',
+    password: await protect(master, pin, 'financ-id:v1:password'),
+    recovery: await protectRecovery(master, code, 'financ-id:v1:recovery') }));
+  return code;
+}
+const isSeed = s => s && Array.isArray(s.words) && s.words.length === 12 && /^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(s.hash);
 
-test('primeiro app cria o FINANC ID; o segundo usa o mesmo PIN sem código novo', async () => {
+test('primeiro app cria o FINANC ID com 12 palavras; o segundo usa o mesmo PIN sem palavras novas', async () => {
   const storage = new MemoryStorage();
   const a = new Vault(storage, 'cambio-sim');
-  const code = await a.create('123456', { cambio_log: '[1]' });
-  assert.match(code, /^[0-9a-f]{8}(-[0-9a-f]{8}){7}$/);
+  const created = await a.create('123456', { cambio_log: '[1]' });
+  assert.ok(isSeed(created));
+  assert.ok(created.words.every(w => wordlist.includes(w)));
+  assert.doesNotMatch(storage.getItem('financ-id-v1'), new RegExp(created.words.join('|')));
   assert.ok(storage.getItem('financ-id-v1'));
   assert.equal(envelopeOf(storage, 'cambio-sim').password, undefined);
 
@@ -67,25 +79,28 @@ test('trocar o PIN num app vale para todos', async () => {
   assert.equal(b.getItem('livro_caixa_x'), 'segredo');
 });
 
-test('código de recuperação FINANC redefine o PIN de todos e é trocado', async () => {
+test('12 palavras ou o hash redefinem o PIN de todos; as palavras continuam as mesmas', async () => {
   const storage = new MemoryStorage();
-  const a = new Vault(storage, 'cambio-sim'); const code = await a.create('123456'); await a.lock();
+  const a = new Vault(storage, 'cambio-sim'); const { words, hash } = await a.create('123456'); await a.lock();
   const b = new Vault(storage, 'taxometro'); await b.create('123456'); await b.lock();
-  const status = await a.resetPassword(code, '222222');
-  assert.notEqual(status.recovery, code);
-  await b.unlock('222222');
-  await b.lock();
-  await assert.rejects(a.resetPassword(code, '333333'), { name: 'OperationError' });
-  await a.lock();
-  await a.resetPassword(status.recovery, '333333');
+  assert.deepEqual(await a.resetPassword(words.join(' '), '222222'), {});
+  await b.unlock('222222'); await b.lock(); await a.lock();
+  // Mesmas palavras de novo (não trocam), agora pelo hash, digitado com minúsculas e sem traços.
+  await a.resetPassword(hash.replace(/-/g, '').toLowerCase(), '333333');
+  await b.unlock('333333'); await b.lock(); await a.lock();
+  // Palavras erradas (válidas na lista e no dígito de conferência) não abrem.
+  const other = await seed.wordsFromEntropy(new Uint8Array(16).fill(7));
+  await assert.rejects(a.resetPassword(other.join(' '), '444444'), { name: 'OperationError' });
+  await assert.rejects(a.resetPassword('abacate abaixo', '444444'), { code: 'SEED_INVALID' });
+  await assert.rejects(a.resetPassword(recoveryCode(), '444444'), { code: 'SEED_INVALID' });
 });
 
-test('app sem cofre neste aparelho entra pelo código FINANC', async () => {
+test('app sem cofre neste aparelho entra pelas 12 palavras', async () => {
   const storage = new MemoryStorage();
-  const a = new Vault(storage, 'cambio-sim'); const code = await a.create('123456');
+  const a = new Vault(storage, 'cambio-sim'); const { words } = await a.create('123456');
   const b = new Vault(storage, 'taxometro');
-  const status = await b.resetPassword(code, '444444');
-  assert.ok(b.linked); assert.ok(status.recovery);
+  const status = await b.resetPassword(words.map(w => w.slice(0, 4).toUpperCase()).join(', '), '444444');
+  assert.ok(b.linked); assert.deepEqual(status, {});
   await a.lock(); await a.unlock('444444');
 });
 
@@ -95,7 +110,7 @@ test('migração: primeiro app antigo vira o FINANC ID e mantém os dados', asyn
   const v = new Vault(storage, 'cripito-sim');
   assert.equal(v.linked, false);
   const status = await v.unlock('123456');
-  assert.ok(status.recovery, 'mostra o código novo do FINANC ID');
+  assert.ok(isSeed(status.seed), 'mostra as 12 palavras do FINANC ID');
   assert.equal(v.linked, true);
   assert.equal(v.getItem('cripto-chain:real'), 'bloco-secreto');
   const env = envelopeOf(storage, 'cripito-sim');
@@ -149,7 +164,7 @@ test('migração: código antigo do app redefine o PIN e cria o FINANC ID', asyn
   const oldCode = await legacyVault(storage, 'cambio-sim', '111111', { cambio_log: 'x' });
   const v = new Vault(storage, 'cambio-sim');
   const status = await v.resetPassword(oldCode, '555555');
-  assert.ok(status.recovery); assert.equal(v.linked, true);
+  assert.ok(isSeed(status.seed)); assert.equal(v.linked, true);
   await v.lock(); await v.unlock('555555');
   assert.equal(v.getItem('cambio_log'), 'x');
 });
@@ -189,7 +204,7 @@ test('apagar um app não apaga o FINANC ID nem os outros apps', async () => {
 
 test('senha longa no lugar do PIN vale para todos os apps', async () => {
   const storage = new MemoryStorage();
-  const a = new Vault(storage, 'cambio-sim'); const code = await a.create('123456');
+  const a = new Vault(storage, 'cambio-sim'); const { words } = await a.create('123456');
   const b = new Vault(storage, 'taxometro'); await b.create('123456'); await b.lock();
   await assert.rejects(a.changeSecretKind('123456', 'curta', 'password'), /10 caracteres/);
   await assert.rejects(a.changeSecretKind('000000', 'minha frase segura', 'password'), { name: 'OperationError' });
@@ -212,6 +227,85 @@ test('senha longa no lugar do PIN vale para todos os apps', async () => {
   // Código de recuperação volta para PIN (a interface de recuperação usa o teclado numérico).
   await a.changeSecretKind('777777', 'frase de novo aqui', 'password');
   await a.lock();
-  await a.resetPassword(code, '222222');
+  await a.resetPassword(words.join(' '), '222222');
   assert.equal(a.secretKind, 'pin');
+});
+
+test('BIP39: semente zero, ida e volta, conferência e abreviações', async () => {
+  const zero = await seed.wordsFromEntropy(new Uint8Array(16));
+  assert.deepEqual(zero, [...Array(11).fill(wordlist[0]), wordlist[3]]); // mesmo padrão de "abandon … about"
+  for (let i = 0; i < 5; i++) {
+    const e = crypto.getRandomValues(new Uint8Array(16)), words = await seed.wordsFromEntropy(e);
+    assert.deepEqual(await seed.entropyFromWords(words.join(' ')), e);
+    assert.deepEqual(await seed.entropyFromWords(words.map(w => w.slice(0, 4).toUpperCase()).join('\n')), e);
+  }
+  const words = await seed.wordsFromEntropy(new Uint8Array(16).fill(3));
+  const swapped = [words[1], words[0], ...words.slice(2)];
+  if (swapped.join() !== words.join()) await assert.rejects(seed.entropyFromWords(swapped.join(' ')), { code: 'SEED_INVALID' });
+  await assert.rejects(seed.entropyFromWords(words.slice(0, 11).join(' ')), /12 palavras/);
+  await assert.rejects(seed.entropyFromWords([...words.slice(0, 11), 'xyzw'].join(' ')), /não existe/);
+  assert.equal(seed.normalizeHash('k7qm-2xpa-9rtd'), 'K7QM2XPA9RTD');
+  assert.equal(seed.normalizeHash('o1i0 L000 0000'), '011010000000');
+  assert.throws(() => seed.normalizeHash('ABC'), { code: 'SEED_INVALID' });
+});
+
+test('FINANC ID antigo ganha as 12 palavras ao abrir; o código antigo deixa de valer', async () => {
+  const storage = new MemoryStorage();
+  const oldCode = await legacyIdentity(storage, '123456');
+  const a = new Vault(storage, 'invest-sim');
+  assert.equal(await a.create('123456', { x: '1' }), null);
+  await a.lock();
+  const status = await a.unlock('123456');
+  assert.ok(isSeed(status.seed));
+  await a.lock();
+  assert.deepEqual(await a.unlock('123456'), {}, 'migra uma vez só');
+  await a.lock();
+  await assert.rejects(a.resetPassword(oldCode, '222222'), { code: 'SEED_INVALID' });
+  await a.resetPassword(status.seed.words.join(' '), '222222');
+  assert.equal(a.getItem('x'), '1');
+});
+
+test('certificado sai das palavras: o mesmo em outro aparelho, e é o atual', async () => {
+  const s1 = new MemoryStorage(), s2 = new MemoryStorage();
+  const a = new Vault(s1, 'cripito-sim'); const { words } = await a.create('123456');
+  const b = new Vault(s2, 'cripito-sim'); await b.create('999999');
+  assert.notEqual(a.certificates[0].id, b.certificates[0].id);
+  const c = new Vault(s2, 'gerenc-fin'); await c.create('999999');
+  // Aparelho 2 passa a usar as palavras do aparelho 1? Não: cada FINANC ID tem as suas. Mas a raiz é a mesma.
+  const root = await seed.rootFromHash(await seed.hashFromEntropy(await seed.entropyFromWords(words.join(' '))));
+  assert.equal((await seed.certFromRoot(root)).id, a.certificates[0].id);
+  assert.equal((await seed.certFromRoot(root)).secret, a.certificates[0].secret);
+});
+
+test('backup v2: abre sem senha no aparelho; em outro, com as 12 palavras ou o hash', async () => {
+  const s1 = new MemoryStorage(), s2 = new MemoryStorage();
+  const a = new Vault(s1, 'invest-sim'); const { words, hash } = await a.create('123456');
+  const file = JSON.parse(JSON.stringify(await a.exportBackup({ saldo: 100 }, 'invest-sim:backup')));
+  assert.equal(file.format, 'financ-backup-v2');
+  assert.doesNotMatch(JSON.stringify(file), /saldo/);
+  assert.deepEqual(await a.importBackup(file, 'invest-sim:backup'), { saldo: 100 });
+  await assert.rejects(a.importBackup(file, 'gerenc-fin:backup'), /incompatível/);
+  const b = new Vault(s2, 'invest-sim'); await b.create('999999');
+  await assert.rejects(b.importBackup(file, 'invest-sim:backup'), { code: 'SEED_REQUIRED' });
+  assert.deepEqual(await b.importBackup(file, 'invest-sim:backup', words.join(' ')), { saldo: 100 });
+  assert.deepEqual(await b.importBackup(file, 'invest-sim:backup', hash), { saldo: 100 });
+  const wrong = await seed.wordsFromEntropy(new Uint8Array(16).fill(9));
+  await assert.rejects(b.importBackup(file, 'invest-sim:backup', wrong.join(' ')), /não abrem este backup/);
+  file.ciphertext = file.ciphertext.replace(/^./, c => c === 'A' ? 'B' : 'A');
+  await assert.rejects(a.importBackup(file, 'invest-sim:backup'), { name: 'OperationError' });
+});
+
+test('gerar novas 12 palavras e ver as palavras de novo com o PIN', async () => {
+  const storage = new MemoryStorage();
+  const a = new Vault(storage, 'cambio-sim'); const first = await a.create('123456');
+  assert.deepEqual(await a.revealSeed('123456'), first);
+  await assert.rejects(a.revealSeed('000000'), { name: 'OperationError' });
+  const oldCert = a.certificates[0].id;
+  const next = await a.rotateRecovery('123456');
+  assert.ok(isSeed(next)); assert.notDeepEqual(next.words, first.words);
+  assert.deepEqual(await a.revealSeed('123456'), next);
+  assert.equal(a.certificates[1].id, oldCert, 'certificado antigo continua guardado');
+  await a.lock();
+  await assert.rejects(a.resetPassword(first.words.join(' '), '222222'), { name: 'OperationError' });
+  await a.resetPassword(next.hash, '222222');
 });
