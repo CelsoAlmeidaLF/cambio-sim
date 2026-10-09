@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v1.12.0';
+const CACHE = 'cambio-app-v1.13.0';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const ASSETS = [
   './js/app.js',
   './stk-pkg-secure-vault.js',
   './stk-pkg-secure-ui.js',
+  './stk-pkg-autosave.js',
   './stk-pkg-secure-ui.css',
   './stk-pkg-financ-icons.js',
   './cambio-icon-192.png',
