@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v1.15.2';
+const CACHE = 'cambio-app-v1.15.3';
 const ASSETS = [
   './',
   './index.html',
@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
   if (new URL(event.request.url).origin !== self.location.origin) return;
   // Rede primeiro: atualizações valem na hora; o cache só entra quando estiver offline.
   event.respondWith(
-    fetch(event.request).then((response) => {
+    fetch(event.request, { cache: 'no-cache' }).then((response) => {
       if (response && response.status === 200 && event.request.method === 'GET') {
         const clone = response.clone();
         caches.open(CACHE).then((cache) => cache.put(event.request, clone));
