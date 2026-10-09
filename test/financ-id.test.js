@@ -309,3 +309,24 @@ test('gerar novas 12 palavras e ver as palavras de novo com o PIN', async () => 
   await assert.rejects(a.resetPassword(first.words.join(' '), '222222'), { name: 'OperationError' });
   await a.resetPassword(next.hash, '222222');
 });
+
+test('FINANC ID antigo reaberto pela sessão (sem PIN) ganha as 12 palavras; ver palavras também cria', async () => {
+  const storage = new MemoryStorage();
+  const sessionKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  await legacyIdentity(storage, '123456');
+  const a = new Vault(storage, 'invest-sim'); a.sessionKey = sessionKey;
+  assert.equal(await a.create('123456', { x: '1' }), null);
+  const blob = a.session;
+  const again = new Vault(storage, 'invest-sim'); again.sessionKey = sessionKey;
+  await again.resume(blob);
+  const status = await again.finishMigration();
+  assert.ok(isSeed(status.seed));
+  assert.deepEqual(await again.finishMigration(), {});
+  assert.deepEqual(await again.revealSeed('123456'), status.seed);
+  // Outro FINANC ID antigo: "Ver minhas 12 palavras" cria e mostra.
+  const s2 = new MemoryStorage(); await legacyIdentity(s2, '654321');
+  const b = new Vault(s2, 'cambio-sim'); await b.create('654321');
+  const shown = await b.revealSeed('654321');
+  assert.ok(isSeed(shown));
+  assert.deepEqual(await b.revealSeed('654321'), shown);
+});
