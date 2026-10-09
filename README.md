@@ -58,7 +58,8 @@ O **Câmbio** é um aplicativo financeiro responsivo desenvolvido com foco em de
    - PBKDF2-SHA-256 com 600.000 iterações protege a chave de dados, que permanece apenas na memória da sessão.
    - A migração remove a chave AES exportável usada pela versão anterior somente depois de confirmar a gravação no novo cofre.
 5. **Sessão e recuperação**:
-   - Bloqueio automático após 15 minutos, atraso progressivo após PIN incorreto e código de recuperação exibido uma única vez.
+   - Bloqueio automático após 15 minutos e atraso progressivo após PIN incorreto.
+   - 12 palavras (ou o código de 12 caracteres equivalente) redefinem o PIN de todos os apps; PDF para imprimir e consulta em Configurações com o PIN.
 6. **Timeouts & Tolerância a Falhas**:
    - Todas as requisições HTTP usam limite de tempo via `AbortController`, impedindo bloqueio de interface em conexões instáveis.
 
