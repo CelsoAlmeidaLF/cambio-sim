@@ -2,10 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
-// Roda tanto em stk-pkg-security/test quanto em <app>/test (o kit fica em <app>/src).
-const kit = ['../stk-pkg-secure-vault.js', '../src/stk-pkg-secure-vault.js'].map(p => path.join(__dirname, p)).find(p => fs.existsSync(p));
+// Roda tanto em stk-pkt-security/test quanto em <app>/test (o kit fica em <app>/src).
+const kit = ['../stk-pkt-secure-vault.js', '../src/stk-pkt-secure-vault.js'].map(p => path.join(__dirname, p)).find(p => fs.existsSync(p));
 const { Vault, protect, recoveryCode, seed } = require(kit);
-const wordlist = require(path.join(path.dirname(kit), 'stk-pkg-bip39-pt.js'));
+const wordlist = require(path.join(path.dirname(kit), 'stk-pkt-bip39-pt.js'));
 
 class MemoryStorage {
   constructor() { this.data = new Map(); }
