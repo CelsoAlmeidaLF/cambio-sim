@@ -36,6 +36,9 @@
   var LOG_KEY = 'cambio_conversions_v3';
 
   var els = {
+    saveError: document.getElementById('save-error'),
+    dataError: document.getElementById('data-error'),
+    dataErrorRestore: document.getElementById('data-error-restore'),
     currencyTabs: document.getElementById('currency-tabs'),
     rateValue: document.getElementById('rate-value'),
     rateDelta: document.getElementById('rate-delta'),
@@ -116,15 +119,19 @@
 
   async function loadEncryptedLog() {
     var raw = localStorage.getItem(LOG_KEY);
-    if (raw) conversionLog = Engine.validateConversionLog(JSON.parse(raw));
-    else {
+    if (raw) {
+      var lido = Engine.readConversionLog(raw);
+      if (!lido.ok) throw new Error('Histórico guardado ilegível.');
+      conversionLog = lido.log;
+    } else {
       var legacy = localStorage.getItem(LOG_ENC_KEY);
       if (legacy) {
         var jwk = localStorage.getItem(DEVICE_KEY_STORAGE);
         if (!jwk) throw new Error('Chave do histórico antigo ausente. Os registros foram preservados.');
         var key = await crypto.subtle.importKey('jwk', JSON.parse(jwk), 'AES-GCM', false, ['decrypt']);
         conversionLog = Engine.validateConversionLog(JSON.parse(await Engine.decryptData(JSON.parse(legacy), key)));
-        await saveEncryptedLog();
+        // Só apaga o histórico antigo depois de gravar o novo: se não gravou, nada é removido.
+        if (!await saveEncryptedLog()) { var falhaGravar = new Error('Histórico não gravado.'); falhaGravar.gravacao = true; throw falhaGravar; }
       }
     }
     localStorage.removeItem(LOG_ENC_KEY);
@@ -132,9 +139,31 @@
     await localStorage.flush();
     renderLog();
   }
+  // Dados que não abriram ficam intactos no aparelho: nada é gravado nem apagado até o usuário restaurar um backup.
+  var dadosIlegiveis = false;
+  // Falha ao GRAVAR (não ao ler): os dados estão bons e os registros antigos continuam guardados.
+  function showSaveError() {
+    if (els.saveError) els.saveError.classList.add('show');
+  }
+  function showDataError() {
+    dadosIlegiveis = true;
+    if (els.dataError) els.dataError.classList.add('show');
+  }
+  /** Grava o histórico e diz se gravou. Com dados ilegíveis não grava (reexibe o aviso); falha de gravação devolve false sem lançar. */
   async function saveEncryptedLog() {
-    localStorage.setItem(LOG_KEY, JSON.stringify(conversionLog));
-    await localStorage.flush();
+    if (dadosIlegiveis) { showDataError(); return false; }
+    var anterior = null;
+    try {
+      anterior = localStorage.getItem(LOG_KEY);
+      localStorage.setItem(LOG_KEY, JSON.stringify(conversionLog));
+      await localStorage.flush();
+      return true;
+    } catch (error) {
+      console.error('Câmbio: falha ao gravar o histórico.');
+      // Desfaz o setItem: um flush posterior (de outra chave) não pode persistir o que a tela mostrou como não salvo.
+      try { if (anterior === null) localStorage.removeItem(LOG_KEY); else localStorage.setItem(LOG_KEY, anterior); } catch (e) { /* já avisamos */ }
+      return false;
+    }
   }
 
   function loadJSON(key, fallback, validator) {
@@ -190,7 +219,7 @@
   function updateNotificationBtnState() {
     if (!els.btnNotifyPerm) return;
     if (!('Notification' in window)) {
-      els.btnNotifyPerm.style.display = 'none';
+      els.btnNotifyPerm.classList.add('is-hidden');
       return;
     }
     if (Notification.permission === 'granted') {
@@ -420,7 +449,8 @@
     els.statHigh.textContent = Engine.fmtBRL(high, 2, cfg.decimals);
     els.statLow.textContent = Engine.fmtBRL(low, 2, cfg.decimals);
     els.statVar.textContent = (varPct >= 0 ? '+' : '') + varPct.toFixed(2) + '%';
-    els.statVar.style.color = varPct >= 0 ? 'var(--up)' : 'var(--down)';
+    els.statVar.classList.toggle('is-up', varPct >= 0);
+    els.statVar.classList.toggle('is-down', varPct < 0);
 
     var firstTimestamp = parseInt(ordered[0].timestamp, 10);
     if (Number.isFinite(firstTimestamp)) {
@@ -579,9 +609,14 @@
       ts: Date.now()
     };
 
-    conversionLog.unshift(entry);
-    conversionLog = conversionLog.slice(0, 10);
-    await saveEncryptedLog();
+    var logAnterior = conversionLog;
+    conversionLog = [entry].concat(conversionLog).slice(0, 10);
+    if (!await saveEncryptedLog()) {
+      // Não gravou: volta ao histórico anterior, não confirma e (se não for dado ilegível) avisa.
+      conversionLog = logAnterior;
+      if (!dadosIlegiveis) setStatus('Não foi possível salvar no histórico. Tente de novo.');
+      return;
+    }
     renderLog();
 
     if (els.btnAddLog) {
@@ -625,7 +660,9 @@
       var when = document.createElement('div');
       when.className = 'when';
       var d = new Date(e.ts);
-      when.textContent = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      // dd/mm/aaaa hh:mm (data + hora do registro)
+      when.textContent = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+        d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
       content.appendChild(what);
       content.appendChild(when);
@@ -842,14 +879,14 @@
   function openModal(modalEl) {
     if (!modalEl) return;
     modalEl.classList.add('active');
-    document.body.style.overflow = 'hidden';
+    document.body.classList.add('modal-open');
   }
 
   function closeModal(modalEl) {
     if (!modalEl) return;
     modalEl.classList.remove('active');
     if (!document.querySelector('.modal-overlay.active')) {
-      document.body.style.overflow = '';
+      document.body.classList.remove('modal-open');
     }
   }
 
@@ -923,7 +960,9 @@
     alertClear_click: clearAlert,
     btnNotifyPerm_click: requestNotificationPermission,
     btnAddLog_click: handleAddCurrentConversion,
+    btnDataRestore_click: function () { window.vaultSettings(); },
     clearLog_click: function () {
+      if (dadosIlegiveis) { showDataError(); return; }
       conversionLog = [];
       localStorage.removeItem(LOG_KEY);
       renderLog();
@@ -958,6 +997,7 @@
     }
 
     els.clearLog.addEventListener('click', UiEvents.clearLog_click);
+    if (els.dataErrorRestore) els.dataErrorRestore.addEventListener('click', UiEvents.btnDataRestore_click);
 
     els.vetAmount.addEventListener('input', UiEvents.vetAmount_input);
     els.vetSpread.addEventListener('input', UiEvents.vetSpread_input);
@@ -974,8 +1014,17 @@
   initModals();
   updateNotificationBtnState();
   loadAlertUI(selectedCurrency);
-  await loadEncryptedLog();
+  try { await loadEncryptedLog(); }
+  catch (error) {
+    if (error && error.gravacao) { console.error('Câmbio: não foi possível gravar o histórico migrado.'); showSaveError(); }
+    else { console.error('Câmbio: não foi possível abrir o histórico guardado.'); showDataError(); }
+  }
   load(false);
   setInterval(function () { load(false); }, 5 * 60 * 1000);
 
-})().catch(error => { alert('Não foi possível abrir os dados: ' + error.message); window.lockVault(); });
+})().catch(function () {
+  // Fora do escopo da função: usa o DOM direto. Falha que não é de leitura de dados: mensagem genérica, gravação segue liberada.
+  console.error('Câmbio: falha ao abrir o aplicativo.');
+  var box = document.getElementById('app-error');
+  if (box) box.classList.add('show');
+});
