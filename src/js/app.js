@@ -625,7 +625,9 @@
       var when = document.createElement('div');
       when.className = 'when';
       var d = new Date(e.ts);
-      when.textContent = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      // dd/mm/aaaa hh:mm (data + hora do registro)
+      when.textContent = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+        d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
       content.appendChild(what);
       content.appendChild(when);

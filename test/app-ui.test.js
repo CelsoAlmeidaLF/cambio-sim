@@ -211,3 +211,16 @@ test('UI VET (A5): cotação de fonte reserva mostra o aviso dentro do modal VET
   assert.match(warningsText($), /fonte reserva/i);
   assert.notEqual($('vet-total').textContent, '—');
 });
+
+test('UI histórico: cada registro mostra data e hora no formato dd/mm/aaaa hh:mm', async () => {
+  const { $, tick } = await boot();
+  $('conv-input').value = '10,00';
+  $('conv-input').fire('input');
+  $('btn-add-log').fire('click');
+  await tick();
+  const frag = $('log-list').children.find((c) => c.children && c.children.length);
+  const item = frag.children[0];
+  const when = item.children[1].children[1];
+  assert.equal(when.className, 'when');
+  assert.match(when.textContent, /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+});
