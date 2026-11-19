@@ -37,7 +37,7 @@ function makeEl(id, value) {
   return el;
 }
 
-async function boot({ tourist = true, fetchImpl } = {}) {
+async function boot({ tourist = true, fetchImpl, preset = {}, spies = {}, qsaFalha = false, flushFalha = null } = {}) {
   const els = {};
   const initial = {};
   for (const m of html.matchAll(/<input[^>]*id="([^"]+)"[^>]*value="([^"]*)"/g)) initial[m[1]] = m[2];
@@ -45,9 +45,9 @@ async function boot({ tourist = true, fetchImpl } = {}) {
     body: { style: {} },
     getElementById(id) { return els[id] || (els[id] = makeEl(id, id === 'vet-iof' ? 'especie' : initial[id])); },
     createElement: () => makeEl('x'), createElementNS: () => makeEl('x'), createDocumentFragment: () => makeEl('frag'),
-    querySelectorAll: () => [], querySelector: () => null, addEventListener() {}
+    querySelectorAll: () => { if (qsaFalha) throw new Error('falha de teste'); return []; }, querySelector: () => null, addEventListener() {}
   };
-  const store = {};
+  const store = Object.assign({}, preset);
   const commercial = (code, bid, ask) => ({ code, codein: 'BRL', name: code + '/BRL', bid: String(bid), ask: String(ask), high: String(ask), low: String(bid), pctChange: '0.1', timestamp: '1790777144' });
   const lastPayload = {
     USDBRL: commercial('USD', 5.18, 5.183), EURBRL: commercial('EUR', 5.84, 5.85), BTCBRL: commercial('BTC', 400000, 400100),
@@ -65,15 +65,16 @@ async function boot({ tourist = true, fetchImpl } = {}) {
     return { ok: true, status: 200, json: async () => body };
   });
   const ctx = {
-    console, setTimeout, clearTimeout, setInterval: () => 0, AbortController, Date, Math, Number, JSON, Promise, Object, Array, String,
+    console: spies.console || console, setTimeout, clearTimeout, setInterval: () => 0, AbortController, Date, Math, Number, JSON, Promise, Object, Array, String,
     document: doc, fetch: fakeFetch, alert: (m) => { throw new Error(m); },
-    FinancIcons: { svg: () => '' },
+    FinancIcons: { svg: () => '' }, crypto: require('node:crypto').webcrypto, TextEncoder, TextDecoder,
     localStorage: {}
   };
   ctx.window = ctx;
   ctx.vaultReady = Promise.resolve();
-  ctx.lockVault = () => {};
-  ctx.secureStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; }, removeItem: (k) => { delete store[k]; }, flush: async () => {} };
+  ctx.lockVault = spies.lockVault || (() => {});
+  ctx.vaultSettings = spies.vaultSettings || (() => {});
+  ctx.secureStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; }, removeItem: (k) => { delete store[k]; }, flush: async () => { if (flushFalha && flushFalha()) throw new Error('QuotaExceededError'); } };
   vm.createContext(ctx);
   for (const f of ['js/cambio-engine.js', 'js/quote-sources.js', 'js/app.js']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f });
@@ -84,7 +85,7 @@ async function boot({ tourist = true, fetchImpl } = {}) {
     const tabs = $('currency-tabs');
     tabs.fire('click', { target: { closest: () => ({ getAttribute: () => cur }) } });
   };
-  return { $, selectCurrency, tick };
+  return { $, selectCurrency, tick, store };
 }
 
 const warningsText = ($) => $('vet-warnings').children.map((c) => c.textContent).join(' | ');
@@ -210,4 +211,173 @@ test('UI VET (A5): cotação de fonte reserva mostra o aviso dentro do modal VET
   $('vet-iof').fire('change');
   assert.match(warningsText($), /fonte reserva/i);
   assert.notEqual($('vet-total').textContent, '—');
+});
+
+test('UI histórico: cada registro mostra data e hora no formato dd/mm/aaaa hh:mm', async () => {
+  const { $, tick } = await boot();
+  $('conv-input').value = '10,00';
+  $('conv-input').fire('input');
+  $('btn-add-log').fire('click');
+  await tick();
+  const frag = $('log-list').children.find((c) => c.children && c.children.length);
+  const item = frag.children[0];
+  const when = item.children[1].children[1];
+  assert.equal(when.className, 'when');
+  assert.match(when.textContent, /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+});
+
+// ---------- Dados que não abrem: mensagem na própria tela, sem alert, sem apagar nem sobrescrever ----------
+const LOG_KEY = 'cambio_conversions_v3';
+
+test('histórico ilegível: mostra o aviso na tela, sem alert, sem voltar ao PIN e só com mensagem fixa no console', async () => {
+  const erros = []; let travou = 0;
+  const { $, store } = await boot({ preset: { [LOG_KEY]: '{quebrado' }, spies: { console: { error: (...a) => erros.push(a.join(' ')), log() {}, warn() {} }, lockVault: () => { travou++; } } });
+  assert.equal($('data-error').classList.contains('show'), true);
+  assert.equal(travou, 0, 'não pode voltar à tela do PIN');
+  assert.deepEqual(erros, ['Câmbio: não foi possível abrir o histórico guardado.']);
+  assert.equal(store[LOG_KEY], '{quebrado', 'dado guardado intacto');
+  assert.ok($('rate-value'), 'o resto do app continua abrindo');
+});
+
+test('histórico ilegível: limpar e adicionar não sobrescrevem o que ficou no aparelho', async () => {
+  const { $, store } = await boot({ preset: { [LOG_KEY]: '{"nao":"lista"}' } });
+  assert.equal($('data-error').classList.contains('show'), true);
+  $('clear-log').fire('click');
+  $('btn-add-log').fire('click');
+  await tick();
+  assert.equal(store[LOG_KEY], '{"nao":"lista"}');
+});
+
+test('histórico ilegível: o botão Restaurar backup abre as Configurações do cofre', async () => {
+  let aberto = 0;
+  const { $ } = await boot({ preset: { [LOG_KEY]: 'x' }, spies: { vaultSettings: () => { aberto++; } } });
+  $('data-error-restore').fire('click');
+  assert.equal(aberto, 1);
+});
+
+test('histórico válido: nenhum aviso aparece', async () => {
+  const log = JSON.stringify([{ from: 'USD', to: 'BRL', inputStr: '1', outputStr: '5', ts: 1 }]);
+  const { $ } = await boot({ preset: { [LOG_KEY]: log } });
+  assert.equal($('data-error').classList.contains('show'), false);
+});
+
+test('Engine.readConversionLog: válido, JSON quebrado e não-lista', () => {
+  const Engine = require('../src/js/cambio-engine.js');
+  assert.equal(Engine.readConversionLog('[]').ok, true);
+  assert.equal(Engine.readConversionLog('[{"from":"USD","to":"BRL","inputStr":"1","outputStr":"5","ts":1}]').log.length, 1);
+  assert.equal(Engine.readConversionLog('{x').ok, false);
+  assert.equal(Engine.readConversionLog('{"a":1}').ok, false);
+  assert.equal(Engine.readConversionLog('null').ok, false);
+});
+
+test('app.js: sem alert nativo, mensagem em português simples no HTML e app.js = Program.js', () => {
+  const app = fs.readFileSync(path.join(SRC, 'js', 'app.js'), 'utf8');
+  assert.doesNotMatch(app.replace(/alert\('Notificações não são suportadas[^\n]*/, ''), /\balert\(/);
+  assert.doesNotMatch(app, /error\.message/);
+  assert.match(html, /Não conseguimos abrir seus dados neste aparelho\. Nada foi apagado\. Restaure um backup nas Configurações \(Seus dados\) ou feche e abra o app de novo\./);
+  assert.equal(app, fs.readFileSync(path.join(SRC, 'js', 'Program.js'), 'utf8'));
+});
+
+// ---------- Correções do QA: salvar sinaliza se gravou; falha genérica não é "dado ilegível" ----------
+const adicionar = async ($) => { $('conv-input').value = '10'; $('conv-input').fire('input'); $('btn-add-log').fire('click'); await tick(); };
+
+test('BUG-2: com dados ilegíveis, "Adicionar ao histórico" não adiciona, não confirma e reexibe o aviso', async () => {
+  const { $, store } = await boot({ preset: { [LOG_KEY]: '{"nao":"lista"}' } });
+  $('data-error').classList.remove('show'); // só o clique pode reexibir
+  await adicionar($);
+  assert.equal($('log-list').children.length, 0, 'nenhuma entrada na tela');
+  assert.doesNotMatch($('btn-add-log').innerHTML, /Adicionado/);
+  assert.equal($('data-error').classList.contains('show'), true, 'aviso reexibido');
+  assert.equal(store[LOG_KEY], '{"nao":"lista"}');
+});
+
+test('adicionar com dados bons continua funcionando (controle)', async () => {
+  const { $, store } = await boot();
+  await adicionar($);
+  assert.equal($('log-list').children.length, 1);
+  assert.match($('btn-add-log').innerHTML, /Adicionado ao histórico/);
+  assert.equal(JSON.parse(store[LOG_KEY]).length, 1);
+});
+
+test('falha de gravação ao adicionar: não confirma, não deixa a entrada na tela e avisa', async () => {
+  let falha = false;
+  const { $ } = await boot({ flushFalha: () => falha });
+  const antes = $('log-list').children.length;
+  falha = true;
+  await adicionar($);
+  assert.equal($('log-list').children.length, antes, 'a entrada não ficou na tela');
+  assert.doesNotMatch($('btn-add-log').innerHTML, /Adicionado/);
+  assert.equal($('status').textContent, 'Não foi possível salvar no histórico. Tente de novo.');
+  assert.equal($('data-error').classList.contains('show'), false, 'não é dado ilegível');
+});
+
+test('falha de abertura sem relação com dados: mensagem genérica, sem aviso de dados e sem travar a gravação', async () => {
+  const erros = [];
+  const log = JSON.stringify([{ from: 'USD', to: 'BRL', inputStr: '1', outputStr: '5', ts: 1 }]);
+  const { $, store } = await boot({ qsaFalha: true, preset: { [LOG_KEY]: log }, spies: { console: { error: (...a) => erros.push(a.join(' ')), log() {}, warn() {} } } });
+  assert.equal($('app-error').classList.contains('show'), true);
+  assert.equal($('data-error').classList.contains('show'), false);
+  assert.deepEqual(erros, ['Câmbio: falha ao abrir o aplicativo.']);
+  $('clear-log').fire('click');
+  assert.equal(store[LOG_KEY], undefined, 'apagar/gravar seguem liberados (o dado estava bom)');
+  assert.equal($('data-error').classList.contains('show'), false);
+});
+
+test('HTML: mensagem genérica exata e espelho idêntico', () => {
+  assert.match(html, /id="app-error"[^>]*>\s*<p>Algo deu errado ao abrir o app\. Feche e abra de novo\.<\/p>/);
+  assert.equal(fs.readFileSync(path.join(SRC, 'cambio-app.html'), 'utf8'), html);
+});
+
+// ---------- Ressalvas do re-teste: desfazer o setItem e mensagem certa na migração ----------
+test('falha de flush: o setItem é desfeito (cofre volta ao que estava) e um flush posterior não persiste a entrada', async () => {
+  let falha = false;
+  const log = JSON.stringify([{ from: 'USD', to: 'BRL', inputStr: '1', outputStr: '5', ts: 1 }]);
+  const { $, store } = await boot({ preset: { [LOG_KEY]: log }, flushFalha: () => falha });
+  falha = true;
+  await adicionar($);
+  assert.equal(store[LOG_KEY], log, 'cofre intacto após a falha');
+  falha = false;
+  await adicionar($); // próxima gravação boa: persiste 2 itens (o antigo + o novo), nunca o que falhou
+  assert.equal(JSON.parse(store[LOG_KEY]).length, 2);
+});
+
+test('falha de flush sem histórico anterior: a chave não fica no cofre', async () => {
+  let falha = false;
+  const { $, store } = await boot({ flushFalha: () => falha });
+  falha = true;
+  await adicionar($);
+  assert.equal(LOG_KEY in store, false);
+});
+
+test('migração do histórico antigo: falha ao gravar mostra a mensagem de gravação (não a de dados) e preserva o antigo', async () => {
+  const wc = require('node:crypto').webcrypto;
+  const key = await wc.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  const jwk = JSON.stringify(await wc.subtle.exportKey('jwk', key));
+  const iv = wc.getRandomValues(new Uint8Array(12));
+  const plain = JSON.stringify([{ from: 'USD', to: 'BRL', inputStr: '1', outputStr: '5', ts: 1 }]);
+  const cipher = new Uint8Array(await wc.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain)));
+  const legacy = JSON.stringify({ iv: Array.from(iv), cipher: Array.from(cipher) });
+  const preset = { cambio_conversions_enc_v2: legacy, cambio_device_key_v2: jwk };
+  const { $, store } = await boot({ preset, flushFalha: () => true });
+  assert.equal($('save-error').classList.contains('show'), true);
+  assert.equal($('data-error').classList.contains('show'), false);
+  assert.equal(store.cambio_conversions_enc_v2, legacy, 'histórico antigo preservado');
+  assert.equal(store.cambio_device_key_v2, jwk, 'chave antiga preservada');
+  assert.equal(LOG_KEY in store, false, 'nada novo ficou no cofre');
+});
+
+test('migração com gravação boa: converte, remove o antigo e não mostra aviso', async () => {
+  const wc = require('node:crypto').webcrypto;
+  const key = await wc.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  const iv = wc.getRandomValues(new Uint8Array(12));
+  const cipher = new Uint8Array(await wc.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify([{ from: 'USD', to: 'BRL', inputStr: '1', outputStr: '5', ts: 1 }]))));
+  const preset = { cambio_conversions_enc_v2: JSON.stringify({ iv: Array.from(iv), cipher: Array.from(cipher) }), cambio_device_key_v2: JSON.stringify(await wc.subtle.exportKey('jwk', key)) };
+  const { $, store } = await boot({ preset });
+  assert.equal($('save-error').classList.contains('show'), false);
+  assert.equal(JSON.parse(store[LOG_KEY]).length, 1);
+  assert.equal('cambio_conversions_enc_v2' in store, false);
+});
+
+test('HTML: mensagem de falha de gravação exata', () => {
+  assert.match(html, /id="save-error"[^>]*>\s*<p>Não foi possível salvar no histórico\. Tente de novo\. Seus registros antigos continuam guardados\.<\/p>/);
 });

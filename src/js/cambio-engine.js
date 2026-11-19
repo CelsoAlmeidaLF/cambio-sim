@@ -378,6 +378,13 @@
     validateTouristQuote: (raw, c, comm) => service.validateTouristQuote(raw, c, comm),
     checkAlertCondition: (alert, price) => service.checkAlertCondition(alert, price),
     validateConversionLog: entries => service.validateConversionLog(entries),
+    /** Lê o histórico guardado sem lançar erro. Texto que não é uma lista não vira lista vazia: é ilegível (não pode ser sobrescrito). */
+    readConversionLog(raw) {
+      let parsed;
+      try { parsed = JSON.parse(raw); } catch (_) { return { ok: false, log: [] }; }
+      if (!Array.isArray(parsed)) return { ok: false, log: [] };
+      return { ok: true, log: service.validateConversionLog(parsed) };
+    },
     validateAlerts: alerts => service.validateAlerts(alerts),
 
     encryptData: CryptoAdapter.encryptData,

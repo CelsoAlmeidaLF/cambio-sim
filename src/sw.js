@@ -1,4 +1,4 @@
-const CACHE = 'cambio-app-v1.15.5';
+const CACHE = 'cambio-app-v1.16.0';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,8 @@ const ASSETS = [
   './css/style.css',
   './js/cambio-engine.js',
   './js/quote-sources.js',
+  './js/program.js',
+  './js/Program.js',
   './js/app.js',
   './stk-pkt-bip39-pt.js', './stk-pkt-secure-vault.js',
   './stk-pkt-secure-ui.js',
