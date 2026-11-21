@@ -818,3 +818,29 @@ footer {
 .stat-card-seed .v.is-down { color: var(--down); }
 .is-hidden { display: none !important; }
 body.modal-open { overflow: hidden; }
+
+/* ==================== RESPONSIVIDADE MULTI-DISPOSITIVO (Mariana UI/UX) ==================== */
+/* 1. Mobile Pequeno (< 380px) */
+@media (max-width: 380px) {
+  .app { padding: 18px 10px 60px; }
+  .tabs { overflow-x: auto; border-radius: 14px; }
+  .tab-btn { font-size: 11px; padding: 9px 4px; }
+  .calc-grid { grid-template-columns: 1fr; }
+  .hero .hero-amount { font-size: 32px; }
+}
+
+/* 2. Tablets (641px - 1024px) */
+@media (min-width: 641px) {
+  .app { max-width: 820px; padding-inline: 24px; }
+}
+
+/* 3. Telas Médias (1025px - 1440px) */
+@media (min-width: 1025px) {
+  .app { max-width: 1080px; padding-inline: 32px; }
+}
+
+/* 4. Monitores Grandes e Ultrawide (> 1440px / 1920px - 4K) */
+@media (min-width: 1441px) {
+  .app { max-width: 1240px; margin: 0 auto; }
+}
+
